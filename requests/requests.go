@@ -5,7 +5,7 @@ import (
 	"elevator/fsm"
 )
 
-func RequestsAbove(e fsm.ElevatorState) bool {
+func RequestsAbove(e elevio.ElevatorState) bool {
 	for f := e.Floor + 1; f < elevio.N_Floors; f++ {
 		for btn := range e.Requests[f] {
 			if e.Requests[f][btn] {
@@ -16,7 +16,7 @@ func RequestsAbove(e fsm.ElevatorState) bool {
 	return false
 }
 
-func RequestsBelow(e fsm.ElevatorState) bool {
+func RequestsBelow(e elevio.ElevatorState) bool {
 	for f := 0; f < e.Floor; f++ {
 		for btn := range e.Requests[f] {
 			if e.Requests[f][btn] {
@@ -27,7 +27,7 @@ func RequestsBelow(e fsm.ElevatorState) bool {
 	return false
 }
 
-func RequestsHere(e fsm.ElevatorState) bool {
+func RequestsHere(e elevio.ElevatorState) bool {
 	for btn := range e.Requests[e.Floor] {
 		if e.Requests[e.Floor][btn] {
 			return true
@@ -36,7 +36,7 @@ func RequestsHere(e fsm.ElevatorState) bool {
 	return false
 }
 
-func ChooseDirection(e fsm.ElevatorState) (elevio.MotorDirection, fsm.ElevatorBehaviour) {
+func ChooseDirection(e elevio.ElevatorState) (elevio.MotorDirection, elevio.ElevatorBehaviour) {
 	switch e.Dir {
 	case elevio.MD_Up:
 		if RequestsAbove(e) {

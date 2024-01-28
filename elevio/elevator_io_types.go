@@ -1,44 +1,48 @@
 package elevio
 
-// Dirn represents the elevator's direction.
+const (
+	N_Floors  = 4
+	N_Buttons = 3
+)
+
 type Dirn int
 
-// Enumeration for elevator directions.
 const (
 	D_Down Dirn = -1
 	D_Stop Dirn = 0
 	D_Up   Dirn = 1
 )
 
-// Button represents the types of buttons in the elevator.
 type Button int
 
-// Enumeration for elevator button types.
 const (
-	B_HallUp Button = iota
-	B_HallDown
-	B_Cab
+	B_HallUp   Button = 0
+	B_HallDown Button = 1
+	B_Cab      Button = 2
 )
 
-// Constants for the number of floors and buttons.
-const (
-	N_Floors  = 4
-	N_Buttons = 3
-)
-
-// ElevInputDevice represents the structure for elevator input devices.
-type ElevInputDevice struct {
-	FloorSensor   func() int
-	RequestButton func(int, Button) int
-	StopButton    func() int
-	Obstruction   func() int
+type ButtonEvent struct {
+	Floor  int
+	Button ButtonType
 }
 
-// ElevOutputDevice represents the structure for elevator output devices.
+type ElevInputDevice struct {
+	FloorSensor   int
+	RequestButton ButtonEvent
+	StopButton    bool
+	Obstruction   bool
+}
+
+type IndividualButton struct {
+	Button ButtonType
+	floor  int
+	value  bool
+}
+
 type ElevOutputDevice struct {
-	FloorIndicator     func(int)
-	RequestButtonLight func(int, Button, int)
-	DoorLight          func(int)
-	StopButtonLight    func(int)
-	MotorDirection     func(Dirn)
+	FloorIndicator     int
+	RequestButtonLight IndividualButton
+	DoorLight          bool
+	StopButtonLight    bool
+	MotorDirection     Dirn
 }

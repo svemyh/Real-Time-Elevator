@@ -7,7 +7,7 @@ import (
 var timer *time.Timer
 var timerActive bool
 
-func timer_start(duration float64) {
+func TimerStart(duration float64) {
 	timer = time.NewTimer(time.Duration(duration) * time.Second)
 	timerActive = true
 }
