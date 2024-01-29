@@ -1,7 +1,7 @@
 package elevio
 
 const (
-	N_Floors  = 4
+	N_Floors = 4
 	N_Buttons = 3
 )
 
@@ -27,10 +27,10 @@ type ButtonEvent struct {
 }
 
 type ElevInputDevice struct {
-	FloorSensor   int
-	RequestButton ButtonEvent
-	StopButton    bool
-	Obstruction   bool
+	FloorSensorCh   chan int
+	RequestButtonCh chan ButtonEvent
+	StopButtonCh    chan bool
+	ObstructionCh   chan bool
 }
 
 type IndividualButton struct {

@@ -1,57 +1,53 @@
 package elevio
 
-
 // Incomplete
-func ElevGetInputDevice() ElevInputDevice {
+// func ElevGetInputDevice() ElevInputDevice {
 
-	floorSensorCh := make(chan int)
-	requestButtonCh := make(chan ButtonEvent)
-	stopButtonCh := make(chan bool)
-	obstructionSwitchCh := make(chan bool)
+// 	floorSensorCh := make(chan int)
+// 	requestButtonCh := make(chan ButtonEvent)
+// 	stopButtonCh := make(chan bool)
+// 	obstructionSwitchCh := make(chan bool)
 
-	return ElevInputDevice{
-		go PollFloorSensor(floorSensorCh)
-		go PollButtons(requestButtonCh)
-		go PollStopButton(stopButtonCh)
-		go PollObstructionSwitch(obstructionSwitchCh)
-		FloorSensor := <-floorSensorCh
-		RequestButton := <-requestButtonCh
-		StopButton := <-stopButtonCh
-		Obstruction := <-obstructionSwitchCh
-	}
-}
+// 	return ElevInputDevice{
+// 		go PollFloorSensor(floorSensorCh)
+// 		go PollButtons(requestButtonCh)
+// 		go PollStopButton(stopButtonCh)
+// 		go PollObstructionSwitch(obstructionSwitchCh)
+// 		FloorSensor := <-floorSensorCh
+// 		RequestButton := <-requestButtonCh
+// 		StopButton := <-stopButtonCh
+// 		Obstruction := <-obstructionSwitchCh
+// 	}
+// }
 
-// Incomplete
-func ElevGetOutputDevice() ElevOutputDevice {
-	ElevSetFloorIndicator(floor int)
+// // Incomplete
+// func ElevGetOutputDevice() ElevOutputDevice {
+// 	ElevSetFloorIndicator(floor int)
 
-	return ElevOutputDevice{
-		
+// 	return ElevOutputDevice{
 
-
-		RequestButtonLight: ElevSetButtonLight(button ButtonType, floor int, value bool),
-		DoorLight:          ElevSetDoorOpenLamp(value bool),
-		StopButtonLight:    ElevSetStopLamp(value bool),
-		MotorDirection:     ElevSetMotorDirection(dirn Dirn),
-	}
-}
+// 		RequestButtonLight: ElevSetButtonLight(button ButtonType, floor int, value bool),
+// 		DoorLight:          ElevSetDoorOpenLamp(value bool),
+// 		StopButtonLight:    ElevSetStopLamp(value bool),
+// 		MotorDirection:     ElevSetMotorDirection(dirn Dirn),
+// 	}
+// }
 
 func NewElevInputDevice() ElevInputDevice {
-    device := ElevInputDevice{
-        FloorSensorCh:        make(chan int),
-        RequestButtonCh:      make(chan ButtonEvent),
-        StopButtonCh:         make(chan bool),
-        ObstructionSwitchCh:  make(chan bool),
-    }
+	device := ElevInputDevice{
+		FloorSensorCh:   make(chan int),
+		RequestButtonCh: make(chan ButtonEvent),
+		StopButtonCh:    make(chan bool),
+		ObstructionCh:   make(chan bool),
+	}
 
-    go PollFloorSensor(device.FloorSensorCh)
-    go PollButtons(device.RequestButtonCh)
-    go PollStopButton(device.StopButtonCh)
-    go PollObstructionSwitch(device.ObstructionSwitchCh)
+	go PollFloorSensor(device.FloorSensorCh)
+	go PollButtons(device.RequestButtonCh)
+	go PollStopButton(device.StopButtonCh)
+	go PollObstructionSwitch(device.ObstructionCh)
 
-    return device
+	return device
 }
-
 
 func elevioDirnToString(d Dirn) string {
 	switch d {

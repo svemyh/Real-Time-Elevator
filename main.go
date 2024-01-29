@@ -1,7 +1,8 @@
 package main
 
 import (
-	"elevator/elevator"
+	"elevator/elevio"
+	"fmt"
 	"time"
 )
 
@@ -40,13 +41,35 @@ func main() {
 	// 	time.Sleep(inputPollRate)
 	// }
 
-	var elev elevator.Elevator
-	elev.Floor = 1
-	elev.Dirn = D_Up
-	elev.Requests[0][1] = 1                  // Example request
-	elev.Behaviour = EB_Idle                 /* ElevatorBehaviour value */
-	elev.Config.ClearRequestVariant = CV_All /* ClearRequestVariant value */
-	elev.Config.DoorOpenDurationS = 3.0
+	// var elev elevator.Elevator
+	// elev.Floor = 1
+	// elev.Dirn = elevio.D_Up
+	// elev.Requests[0][1] = 1                           // Example request
+	// elev.Behaviour = elevator.EB_Idle                 /* ElevatorBehaviour value */
+	// elev.Config.ClearRequestVariant = elevator.CV_All /* ClearRequestVariant value */
+	// elev.Config.DoorOpenDurationS = 3.0
+	var device elevio.ElevInputDevice
 
-	device := NewElevInputDevice()
+	go elevio.PollFloorSensor(device.FloorSensorCh)
+	go elevio.PollButtons(device.RequestButtonCh)
+	go elevio.PollStopButton(device.StopButtonCh)
+	go elevio.PollObstructionSwitch(device.ObstructionCh)
+
+	// Run for a short period to demonstrate receiving signals
+	endTime := time.Now().Add(10 * time.Second)
+	for time.Now().Before(endTime) {
+		select {
+		case floor := <-device.FloorSensorCh:
+			fmt.Println("Floor Sensor:", floor)
+		case buttonEvent := <-device.RequestButtonCh:
+			fmt.Println("Button Pressed:", buttonEvent)
+		case stopSignal := <-device.StopButtonCh:
+			fmt.Println("Stop Button Pressed", stopSignal)
+		case obstructionSignal := <-device.ObstructionCh:
+			fmt.Println("Obstruction Detected", obstructionSignal)
+		default:
+			// No action - prevents blocking on channel reads
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
 }

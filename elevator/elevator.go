@@ -4,39 +4,42 @@ import (
 	"elevator/elevio"
 )
 
-type ElevatorBehaviour struct {
-	EB_Idle = 0
-	EB_DoorOpen = 1
-	EB_Moving = 2
-}
+type ElevatorBehaviour int
 
-type ClearRequestVariant struct {
-	CV_All = 0
-	CV_InDoorn = 1
-}
+const (
+	EB_Idle     ElevatorBehaviour = 0
+	EB_DoorOpen ElevatorBehaviour = 1
+	EB_Moving   ElevatorBehaviour = 2
+)
 
+type ClearRequestVariant int
+
+const (
+	CV_All     ClearRequestVariant = 0
+	CV_InDoorn ClearRequestVariant = 1
+)
+
+type Config struct {
+	ClearRequestVariant ClearRequestVariant
+	DoorOpenDurationS   float64
+}
 
 type Elevator struct {
-	Floor int
-	Dirn Dirn
-	Requests [N_FLOORS][N_BUTTONS]int
-	Behaviour ElevatorBehaviour 
-
-	Config struct {
-		ClearRequestVariant ClearRequestVariant
-		DoorOpenDurationS   double
-	}
+	Floor     int
+	Dirn      elevio.Dirn
+	Requests  [elevio.N_Floors][elevio.N_Buttons]int
+	Behaviour ElevatorBehaviour
+	Config    Config
 }
-
 
 func ElevatorInit() Elevator {
 	return Elevator{
-		Floor: -1,
-		Dirn: D_Stop,
+		Floor:     -1,
+		Dirn:      elevio.D_Stop,
 		Behaviour: EB_Idle,
-		Config: {
+		Config: Config{
 			ClearRequestVariant: CV_All,
-			DoorOpenDurationS: 3.0,
+			DoorOpenDurationS:   3.0,
 		},
 	}
 }

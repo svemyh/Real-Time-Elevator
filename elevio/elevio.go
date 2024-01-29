@@ -32,10 +32,10 @@ const (
 	BT_Cab                 = 2
 )
 
-type ButtonEvent struct {
-	Floor  int
-	Button ButtonType
-}
+// type ButtonEvent struct {
+// 	Floor  int
+// 	Button ButtonType
+// }
 
 func Init(addr string, numFloors int) {
 	if _initialized {
