@@ -57,6 +57,7 @@ func main() {
 
 	// Run for a short period to demonstrate receiving signals
 	endTime := time.Now().Add(10 * time.Second)
+
 	for time.Now().Before(endTime) {
 		select {
 		case floor := <-device.FloorSensorCh:
