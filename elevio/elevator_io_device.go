@@ -49,7 +49,7 @@ func NewElevInputDevice() ElevInputDevice {
 	return device
 }
 
-func elevioDirnToString(d Dirn) string {
+func DirnToString(d Dirn) string {
 	switch d {
 	case D_Up:
 		return "D_Up"
@@ -62,7 +62,7 @@ func elevioDirnToString(d Dirn) string {
 	}
 }
 
-func elevioButtonToString(b Button) string {
+func ButtonToString(b Button) string {
 	switch b {
 	case B_HallUp:
 		return "B_HallUp"

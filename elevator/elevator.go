@@ -7,16 +7,16 @@ import (
 type ElevatorBehaviour int
 
 const (
-	EB_Idle     ElevatorBehaviour = 0
-	EB_DoorOpen ElevatorBehaviour = 1
-	EB_Moving   ElevatorBehaviour = 2
+	EB_Idle ElevatorBehaviour = iota
+	EB_DoorOpen
+	EB_Moving
 )
 
 type ClearRequestVariant int
 
 const (
-	CV_All     ClearRequestVariant = 0
-	CV_InDoorn ClearRequestVariant = 1
+	CV_All ClearRequestVariant = iota
+	CV_InDoorn
 )
 
 type Config struct {
@@ -27,7 +27,7 @@ type Config struct {
 type Elevator struct {
 	Floor     int
 	Dirn      elevio.Dirn
-	Requests  [elevio.N_Floors][elevio.N_Buttons]int
+	Requests  [elevio.N_Floors][elevio.N_Buttons]bool // set to bool instead of int
 	Behaviour ElevatorBehaviour
 	Config    Config
 }
