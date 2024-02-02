@@ -52,6 +52,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 
 	switch elevatorState.Behaviour {
 	case elevator.EB_DoorOpen:
+		println("Door Open")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
 			timer.TimerStart(5) // it had elevator.Config.DoorOpenDurationS.Seconds() as argument?
 		} else {
@@ -60,15 +61,17 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 		
 
 	case elevator.EB_Moving:
+		println("Moving")
 		elevatorState.Requests[btnFloor][btnType] = true
 		
 
 	case elevator.EB_Idle:
+		println("Idle")
 		elevatorState.Requests[btnFloor][btnType] = true
 		//pair := requests.ChooseDirection(elevator)
 		//elevator.Dirn = pair.Dirn
 		//elevator.Behaviour = pair.Behaviour
-		_, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
+		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
@@ -103,7 +106,7 @@ func FsmOnFloorArrival(newFloor int) {
 	switch elevatorState.Behaviour {
 	case elevator.EB_Moving:
 		if requests.ShouldStop(elevatorState) {
-			elevio.SetMotorDirection(elevio.MD_Stop)
+			elevio.SetMotorDirection(elevio.MotorDirection(elevio.D_Stop))
 			elevio.SetDoorOpenLamp(true)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
@@ -128,7 +131,7 @@ func FsmOnDoorTimeout() {
 		// elevatorState.Dirn = pair.Dirn 	// This part doesn't get used anyways, but wouldn't have worked since ChooseDirection returns motordirection
 		// elevatorState.Behaviour = pair.Behaviour
 
-		_, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
+		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)

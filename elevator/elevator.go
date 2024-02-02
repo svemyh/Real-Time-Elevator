@@ -27,7 +27,7 @@ type Config struct {
 type Elevator struct {
 	Floor     int
 	Dirn      elevio.Dirn
-	Requests  [elevio.N_Floors][elevio.N_Buttons]bool // set to bool instead of int
+	Requests  [elevio.N_Floors][elevio.N_Buttons]bool 
 	Behaviour ElevatorBehaviour
 	Config    Config
 }
