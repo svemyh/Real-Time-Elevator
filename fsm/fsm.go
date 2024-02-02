@@ -41,7 +41,7 @@ func SetAllLights() {
 func FsmOnInitBetweenFloors() {
 	//outputDevice.SetMotorDirection(elevio.MD_Down)
 	elevio.SetMotorDirection(elevio.MD_Down) // added
-
+	//elevio.SetMotorDirection(elevio.MotorDirection(elevio.D_Stop)) //test
 	elevatorState.Dirn = elevio.D_Down // Was set to motordirection, but elevatorState requires Dirn
 	elevatorState.Behaviour = elevator.EB_Moving
 }
@@ -106,7 +106,7 @@ func FsmOnFloorArrival(newFloor int) {
 	switch elevatorState.Behaviour {
 	case elevator.EB_Moving:
 		if requests.ShouldStop(elevatorState) {
-			elevio.SetMotorDirection(elevio.MotorDirection(elevio.D_Stop))
+			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevio.SetDoorOpenLamp(true)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
@@ -139,12 +139,12 @@ func FsmOnDoorTimeout() {
 			SetAllLights()
 		case elevator.EB_Moving, elevator.EB_Idle:
 			elevio.SetDoorOpenLamp(false)
-			elevio.SetMotorDirection(elevio.MotorDirection(elevio.MD_Stop))
+			elevio.SetMotorDirection(elevio.MD_Stop)
 		}
 		
 	default:
 		break
 	}
-
+	fmt.Printf("-------------------------------")
 	fmt.Printf("\nNew state:\n")
 }

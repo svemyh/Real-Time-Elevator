@@ -46,6 +46,7 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
     fmt.Println("Requests Above:", RequestsAbove(e))
     fmt.Println("Requests Here:", RequestsHere(e))
     fmt.Println("Requests Below:", RequestsBelow(e))
+	fmt.Println("e.Dirn", e.Dirn)
 	switch e.Dirn {
 	case elevio.D_Up:
 		println("Case up")

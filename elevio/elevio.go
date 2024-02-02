@@ -52,7 +52,7 @@ func Init(addr string, numFloors int) {
 	_initialized = true
 }
 
-func SetMotorDirection(dirn MotorDirection) {
+func SetMotorDirection(dirn MotorDirection) { //check if correct
 	write([4]byte{1, byte(dirn), 0, 0})
 }
 
