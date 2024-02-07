@@ -46,6 +46,14 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
     fmt.Println("Requests Above:", RequestsAbove(e))
     fmt.Println("Requests Here:", RequestsHere(e))
     fmt.Println("Requests Below:", RequestsBelow(e))
+
+	if RequestsAbove(e) {
+		e.Dirn = elevio.D_Up
+	} else if RequestsBelow(e) {
+		e.Dirn = elevio.D_Down
+	} else if RequestsHere(e) {
+		e.Dirn = elevio.D_Stop
+	}
 	fmt.Println("e.Dirn", e.Dirn)
 	switch e.Dirn {
 	case elevio.D_Up:
@@ -74,7 +82,7 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
 		}
 	}
 	println("Request stop")
-	return elevio.D_Stop, elevator.EB_Idle
+	return elevio.D_Stop, elevator.EB_Idle 	
 }
 
 func ShouldStop(e elevator.Elevator) bool {

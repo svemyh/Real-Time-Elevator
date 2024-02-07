@@ -100,10 +100,6 @@ func main() {
 		flr := elevio.GetFloor() 
         if flr != -1 && flr != prev {
             fsm.FsmOnFloorArrival(flr) 
-            if timer.TimerTimedOut() {
-                timer.TimerStop()
-                fsm.FsmOnDoorTimeout()
-            }
         }
         prev = flr
 

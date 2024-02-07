@@ -40,9 +40,9 @@ func SetAllLights() {
 
 func FsmOnInitBetweenFloors() {
 	//outputDevice.SetMotorDirection(elevio.MD_Down)
-	elevio.SetMotorDirection(elevio.MD_Down) // added
+	elevio.SetMotorDirection(elevio.D_Down) // from MD_Down to D_Down
 	//elevio.SetMotorDirection(elevio.MotorDirection(elevio.D_Stop)) //test
-	elevatorState.Dirn = elevio.D_Down // Was set to motordirection, but elevatorState requires Dirn
+	elevatorState.Dirn = elevio.D_Down 
 	elevatorState.Behaviour = elevator.EB_Moving
 }
 
@@ -75,16 +75,19 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
+			fmt.Println("EB_DoorOpen")
 			outputDevice.DoorLight = true
 			timer.TimerStart(5) // it had elevator.Config.DoorOpenDurationS.Seconds() as argument?
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			
 
 		case elevator.EB_Moving:
-			outputDevice.MotorDirection = elevatorState.Dirn
+			elevio.SetMotorDirection(elevatorState.Dirn)
+			fmt.Println("Elevator state moving dirn", elevatorState.Dirn)
 			
 
 		case elevator.EB_Idle:
+			fmt.Println("EB_Idle")
 			break
 		}
 		
@@ -106,14 +109,15 @@ func FsmOnFloorArrival(newFloor int) {
 	switch elevatorState.Behaviour {
 	case elevator.EB_Moving:
 		if requests.ShouldStop(elevatorState) {
-			elevio.SetMotorDirection(elevio.MD_Stop)
+			fmt.Println("Should stop")
+			elevio.SetMotorDirection(elevio.D_Stop) // from MD_Stop to D_Stop
 			elevio.SetDoorOpenLamp(true)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
 			SetAllLights() // specific floor?
 			elevatorState.Behaviour = elevator.EB_DoorOpen
 		}
-		
+		break
 	default:
 		break
 	}
@@ -134,12 +138,17 @@ func FsmOnDoorTimeout() {
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
+			fmt.Println("EB Door Open")
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			SetAllLights()
-		case elevator.EB_Moving, elevator.EB_Idle:
+		case elevator.EB_Moving:
+			fmt.Println("EB moving")
+			break
+		case elevator.EB_Idle:
+			fmt.Println("EB idle")
 			elevio.SetDoorOpenLamp(false)
-			elevio.SetMotorDirection(elevio.MD_Stop)
+			elevio.SetMotorDirection(elevio.D_Stop) // MD_Stop to D_Stop
 		}
 		
 	default:
