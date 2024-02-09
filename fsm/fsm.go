@@ -88,7 +88,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 
 		case elevator.EB_Idle:
 			fmt.Println("EB_Idle")
-			break
+			
 		}
 		
 	}
@@ -117,7 +117,6 @@ func FsmOnFloorArrival(newFloor int) {
 			SetAllLights() // specific floor?
 			elevatorState.Behaviour = elevator.EB_DoorOpen
 		}
-		break
 	default:
 		break
 	}
@@ -144,8 +143,9 @@ func FsmOnDoorTimeout() {
 			SetAllLights()
 		case elevator.EB_Moving:
 			fmt.Println("EB moving")
+			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(elevatorState.Dirn)
-			break
+			
 		case elevator.EB_Idle:
 			fmt.Println("EB idle")
 			elevio.SetDoorOpenLamp(false)
