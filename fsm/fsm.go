@@ -144,6 +144,7 @@ func FsmOnDoorTimeout() {
 			SetAllLights()
 		case elevator.EB_Moving:
 			fmt.Println("EB moving")
+			elevio.SetMotorDirection(elevatorState.Dirn)
 			break
 		case elevator.EB_Idle:
 			fmt.Println("EB idle")
