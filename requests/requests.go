@@ -80,6 +80,13 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
 			println("Request up")
 			return elevio.D_Up, elevator.EB_Moving
 		}
+	case elevio.D_Stop:
+		println("Case stop")
+		if RequestsHere(e) {
+			println("Request here")
+			return elevio.D_Up, elevator.EB_DoorOpen
+		} 
+
 	}
 	println("Request stop")
 	return elevio.D_Stop, elevator.EB_Idle 	
