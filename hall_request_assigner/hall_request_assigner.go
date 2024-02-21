@@ -16,7 +16,7 @@ type HRAInput struct {
 }
 
 // Consider an array called "ActiveElevators" of objects (or pointers to objects) of type elevio.Elevator, where each elevio.Elevator corresponds to an "active/alive" elevator, that can take requests.
-// Make a function that takes in "ActiveElevators" and spits out a similar array of elevio.Elevator objects with newly assigned requests. This array will be fed to the fsm of the individual elevators.
+// Make a function HallRequestAssigner that takes in "ActiveElevators" and spits out a similar array of elevio.Elevator objects with newly assigned requests. This array will be fed to the fsm of the individual elevators.
 
 
 

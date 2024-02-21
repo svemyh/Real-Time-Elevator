@@ -169,6 +169,7 @@ func FsmRun(device elevio.ElevInputDevice) {
 			fmt.Println("Floor Sensor:", floor)
 			if floor != -1 && floor != prev {
 				FsmOnFloorArrival(floor)
+				//sendToMaster
 			}
 			prev = floor
 
