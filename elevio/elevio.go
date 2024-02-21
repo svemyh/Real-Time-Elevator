@@ -18,12 +18,6 @@ var _conn net.Conn
 
 type MotorDirection int
 
-const (
-	MD_Up   MotorDirection = 1
-	MD_Down MotorDirection = -1
-	MD_Stop MotorDirection = 0
-)
-
 type ButtonType int
 
 const (
@@ -52,7 +46,7 @@ func Init(addr string, numFloors int) {
 	_initialized = true
 }
 
-func SetMotorDirection(dirn MotorDirection) {
+func SetMotorDirection(dirn Dirn) { //from MotorDirection to Dirn
 	write([4]byte{1, byte(dirn), 0, 0})
 }
 

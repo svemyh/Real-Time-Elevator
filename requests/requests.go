@@ -3,8 +3,12 @@ package requests
 import (
 	"elevator/elevator"
 	"elevator/elevio"
+	"fmt"
+
 	//"elevator/fsm"
 )
+
+var elevatorState elevator.Elevator
 
 func RequestsAbove(e elevator.Elevator) bool {
 	for f := e.Floor + 1; f < elevio.N_Floors; f++ {
@@ -37,26 +41,55 @@ func RequestsHere(e elevator.Elevator) bool {
 	return false
 }
 
-func ChooseDirection(e elevator.Elevator) (elevio.MotorDirection, elevator.ElevatorBehaviour) { // Elevator doesn't have a motorDirection, but it does have a Dirn
+func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehaviour) { // Elevator doesn't have a motorDirection, but it does have a Dirn
+	// Temporary debug output to understand the state of requests
+    fmt.Println("Requests Above:", RequestsAbove(e))
+    fmt.Println("Requests Here:", RequestsHere(e))
+    fmt.Println("Requests Below:", RequestsBelow(e))
+
+	if RequestsAbove(e) {
+		e.Dirn = elevio.D_Up
+	} else if RequestsBelow(e) {
+		e.Dirn = elevio.D_Down
+	} else if RequestsHere(e) {
+		e.Dirn = elevio.D_Stop
+	}
+	fmt.Println("e.Dirn", e.Dirn)
 	switch e.Dirn {
 	case elevio.D_Up:
+		println("Case up")
 		if RequestsAbove(e) {
-			return elevio.MD_Up, elevator.EB_Moving
+			println("Request up")
+			return elevio.D_Up, elevator.EB_Moving
 		} else if RequestsHere(e) {
-			return elevio.MD_Down, elevator.EB_DoorOpen
+			println("Request here")
+			return elevio.D_Down, elevator.EB_DoorOpen
 		} else if RequestsBelow(e) {
-			return elevio.MD_Down, elevator.EB_Moving
+			println("Request below")
+			return elevio.D_Down, elevator.EB_Moving
 		}
 	case elevio.D_Down:
+		println("Case down")
 		if RequestsBelow(e) {
-			return elevio.MD_Down, elevator.EB_Moving
+			println("Request below")
+			return elevio.D_Down, elevator.EB_Moving
 		} else if RequestsHere(e) {
-			return elevio.MD_Up, elevator.EB_DoorOpen
+			println("Request here")
+			return elevio.D_Up, elevator.EB_DoorOpen
 		} else if RequestsAbove(e) {
-			return elevio.MD_Up, elevator.EB_Moving
+			println("Request up")
+			return elevio.D_Up, elevator.EB_Moving
 		}
+	case elevio.D_Stop:
+		println("Case stop")
+		if RequestsHere(e) {
+			println("Request here")
+			return elevio.D_Up, elevator.EB_DoorOpen
+		} 
+
 	}
-	return elevio.MD_Stop, elevator.EB_Idle
+	println("Request stop")
+	return elevio.D_Stop, elevator.EB_Idle 	
 }
 
 func ShouldStop(e elevator.Elevator) bool {
