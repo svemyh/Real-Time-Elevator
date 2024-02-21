@@ -6,7 +6,7 @@ import (
 	"elevator/requests"
 	"elevator/timer"
 	"fmt"
-	//"time"
+	"time"
 )
 
 // var outputDevice elevio.ElevOutputDevice // Not necessary on Go only in C?
@@ -42,7 +42,7 @@ func FsmOnInitBetweenFloors() {
 	//outputDevice.SetMotorDirection(elevio.MD_Down)
 	elevio.SetMotorDirection(elevio.D_Down) // from MD_Down to D_Down
 	//elevio.SetMotorDirection(elevio.MotorDirection(elevio.D_Stop)) //test
-	elevatorState.Dirn = elevio.D_Down 
+	elevatorState.Dirn = elevio.D_Down
 	elevatorState.Behaviour = elevator.EB_Moving
 }
 
@@ -58,12 +58,10 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 		} else {
 			elevatorState.Requests[btnFloor][btnType] = true
 		}
-		
 
 	case elevator.EB_Moving:
 		println("Moving")
 		elevatorState.Requests[btnFloor][btnType] = true
-		
 
 	case elevator.EB_Idle:
 		println("Idle")
@@ -79,18 +77,16 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 			outputDevice.DoorLight = true
 			timer.TimerStart(5) // it had elevator.Config.DoorOpenDurationS.Seconds() as argument?
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
-			
 
 		case elevator.EB_Moving:
 			elevio.SetMotorDirection(elevatorState.Dirn)
 			fmt.Println("Elevator state moving dirn", elevatorState.Dirn)
-			
 
 		case elevator.EB_Idle:
 			fmt.Println("EB_Idle")
-			
+
 		}
-		
+
 	}
 
 	SetAllLights()
@@ -145,16 +141,52 @@ func FsmOnDoorTimeout() {
 			fmt.Println("EB moving")
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(elevatorState.Dirn)
-			
+
 		case elevator.EB_Idle:
 			fmt.Println("EB idle")
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(elevio.D_Stop) // MD_Stop to D_Stop
 		}
-		
+
 	default:
 		break
 	}
 	fmt.Printf("-------------------------------")
 	fmt.Printf("\nNew state:\n")
+}
+
+func FsmRun(device elevio.ElevInputDevice) {
+	var prev int = -1
+
+	if f := elevio.GetFloor(); f == -1 {
+		FsmOnInitBetweenFloors()
+	}
+
+	// Polling for new actions/events of the system.
+	for {
+		select {
+		case floor := <-device.FloorSensorCh:
+			fmt.Println("Floor Sensor:", floor)
+			if floor != -1 && floor != prev {
+				FsmOnFloorArrival(floor)
+				//sendToMaster
+			}
+			prev = floor
+
+		case buttonEvent := <-device.RequestButtonCh:
+			fmt.Println("Button Pressed:", buttonEvent)
+			FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button))
+
+		case obstructionSignal := <-device.ObstructionCh:
+			fmt.Println("Obstruction Detected", obstructionSignal)
+
+		default:
+			// No action - prevents blocking on channel reads
+			time.Sleep(500 * time.Millisecond)
+		}
+		if timer.TimerTimedOut() { // should be reworked into a channel
+			timer.TimerStop()
+			FsmOnDoorTimeout()
+		}
+	}
 }

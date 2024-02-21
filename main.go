@@ -3,61 +3,17 @@ package main
 import (
 	"elevator/elevio"
 	"elevator/fsm"
-	"elevator/timer"
+	"elevator/hall_request_assigner"
+	"encoding/json"
 	"fmt"
+	"os/exec"
+	"runtime"
 	"time"
 )
 
 const inputPollRate = 25 * time.Millisecond
 
-var prev int = -1
-
 func main() {
-	// elevio.Init("localhost:15657", elevio.N_Floors)
-
-	// // Initialize the elevator to a known state
-	// if elevio.GetFloor() == -1 {
-	// 	fsm.FsmOnInitBetweenFloors()
-	// }
-
-	// // Main loop
-	// for {
-	// 	// Poll request buttons
-	// 	for f := 0; f < elevio.N_Floors; f++ {
-	// 		for b := elevio.BT_HallUp; b <= elevio.BT_Cab; b++ {	// 	// Handle door timeout
-	// 	if timer.TimerTimedOut() {
-	// 		timer.TimerStop()
-	// 		fsm.FsmOnDoorTimeout()
-	// 	}
-	// 			if v := elevio.GetButton(b, f); v {
-	// 				fsm.FsmOnRequestButtonPress(f, b)
-	// 			}
-	// 		}
-	// 	}
-
-	// 	// Poll floor sensor
-	// 	if f := elevio.GetFloor(); f != -1 {
-	// 		fsm.FsmOnFloorArrival(f)
-	// 	}
-
-	// 	// Handle door timeout
-	// 	if timer.TimerTimedOut() {
-	// 		timer.TimerStop()
-	// 		fsm.FsmOnDoorTimeout()
-	// 	}
-
-	// 	time.Sleep(inputPollRate)
-	// }
-
-	// var elev elevator.Elevator
-	// elev.Floor = 1
-	// elev.Dirn = elevio.D_Up
-	// elev.Requests[0][1] = 1                           // Example request
-	// elev.Behaviour = elevator.EB_Idle                 /* ElevatorBehaviour value */
-	// elev.Config.ClearRequestVariant = elevator.CV_All /* ClearRequestVariant value */
-	// elev.Config.DoorOpenDurationS = 3.0
-	//var device elevio.ElevInputDevice
-
 	elevio.Init("localhost:15657", elevio.N_Floors)
 
 	fmt.Printf("Started!\n")
@@ -68,65 +24,109 @@ func main() {
 		StopButtonCh:    make(chan bool),
 		ObstructionCh:   make(chan bool),
 	}
+	//fsm_terminate := make(chan, bool)
 
 	go elevio.PollFloorSensor(device.FloorSensorCh)
 	go elevio.PollButtons(device.RequestButtonCh)
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	// TODO(?): if input.floorSensor() == -1 {fsm_onInitBetweenFloors()}
+	go fsm.FsmRun(device)
 
-	// Run for a short period to demonstrate receiving signals. Check!
-	// endTime := time.Now().Add(10 * time.Second)
-	// for time.Now().Before(endTime) {
-
-	if f := elevio.GetFloor(); f == -1 {
-		fsm.FsmOnInitBetweenFloors()
+	hraExecutable := ""
+	switch runtime.GOOS {
+	case "linux":
+		hraExecutable = "hall_request_assigner"
+	case "windows":
+		hraExecutable = "hall_request_assigner.exe"
+	default:
+		panic("OS not supported")
 	}
 
-	for {
-		// Poll request buttons
-		for f := 0; f < elevio.N_Floors; f++ {
-			// for b := elevio.BT_HallUp; b <= elevio.BT_Cab; b++ {
-			for b := elevio.BT_HallUp; b <= elevio.BT_Cab; b++ {
-				if v := elevio.GetButton(b, f); v {
-					fsm.FsmOnRequestButtonPress(f, elevio.Button(b))
-				}
-			}
-		}
-
-		// Poll floor sensor
-
-		flr := elevio.GetFloor() 
-        if flr != -1 && flr != prev {
-            fsm.FsmOnFloorArrival(flr) 
-        }
-        prev = flr
-
-		// Handle door timeout
-		if timer.TimerTimedOut() {
-			timer.TimerStop()
-			fsm.FsmOnDoorTimeout()
-		}
-
-		// for {
-		// 	select {
-		// 	case floor := <-device.FloorSensorCh:
-		// 		fmt.Println("Floor Sensor:", floor)
-		// 		break
-		// 	case buttonEvent := <-device.RequestButtonCh:
-		// 		fmt.Println("Button Pressed:", buttonEvent)
-		// 		break
-		// 	case stopSignal := <-device.StopButtonCh:
-		// 		fmt.Println("Stop Button Pressed", stopSignal)
-		// 		break
-		// 	case obstructionSignal := <-device.ObstructionCh:
-		// 		fmt.Println("Obstruction Detected", obstructionSignal)
-		// 		break
-		// 	default:
-		// 		// No action - prevents blocking on channel reads
-		// 		time.Sleep(500 * time.Millisecond)
-		// 	}
-		// }
+	input := hall_request_assigner.HRAInput{
+		HallRequests: [][2]bool{{false, false}, {true, false}, {false, false}, {false, true}},
+		States: map[string]hall_request_assigner.HRAElevState{
+			"one": hall_request_assigner.HRAElevState{
+				Behavior:    "moving",
+				Floor:       2,
+				Direction:   "up",
+				CabRequests: []bool{false, false, false, true},
+			},
+			"two": hall_request_assigner.HRAElevState{
+				Behavior:    "idle",
+				Floor:       0,
+				Direction:   "stop",
+				CabRequests: []bool{false, false, false, false},
+			},
+			"three": hall_request_assigner.HRAElevState{
+				Behavior:    "idle",
+				Floor:       0,
+				Direction:   "stop",
+				CabRequests: []bool{false, false, false, false},
+			},
+		},
 	}
+
+	jsonBytes, err := json.Marshal(input)
+	if err != nil {
+		fmt.Println("json.Marshal error: ", err)
+		return
+	}
+
+	ret, err := exec.Command("hall_request_assigner/"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
+	if err != nil {
+		fmt.Println("exec.Command error: ", err)
+		fmt.Println(string(ret))
+		return
+	}
+
+	output := new(map[string][][2]bool)
+	err = json.Unmarshal(ret, &output)
+	if err != nil {
+		fmt.Println("json.Unmarshal error: ", err)
+		return
+	}
+
+	fmt.Printf("output: \n")
+	for k, v := range *output {
+		fmt.Printf("%6v :  %+v\n", k, v)
+	}
+
+	select {}
+
+	// myState := InitStateByBroadcastingNetworkAndWait()
+	// If myState == PRIMARY:
+	//		ActiveElevators <- getAllElevatorStates()
+	// 		sendOverNetworkToSecondary(ActiveElevators)
+	//		for {
+	//			ack <- network_recieved_ack
+	//			time.sleep()
+	//		}
+	//      NewElevatorOrders = HallRequestAssigner(ActiveElevators)
+	//		DistributeOrdersOverNetwork(NewElevatorOrders)
+	//
+	// func DistributeOrdersOverNetwork(NewElevatorOrders):
+	//
+	// 		for i in ActiveElevators:
+	//			sendOverNetwork(ActiveElevators[i])
+	//			for {
+	//				ack <- network_reciever
+	//				time.sleep()
+	//			}
+	//
+	//		for i in ActiveElevators:
+	//			sendOverNetwork(buttonlights)
+	//			for {
+	//				ack <- network_reciever
+	//				time.sleep()
+	//			}
+	//
+	//
+	// chan networkReciever
+	// func getAllElevatorStates(chan networkReciever)
+
+	// case newEvent := <- networkReciever
+	//	 (MYIP, elevio.elevator)
+	//   ActiveElevators("MYIP") = elevio.elevator
+
 }
