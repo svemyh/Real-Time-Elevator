@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
-	"time"
+	"elevator/network"
 )
-
-const inputPollRate = 25 * time.Millisecond
 
 func main() {
 	elevio.Init("localhost:15657", elevio.N_Floors)
@@ -32,7 +30,7 @@ func main() {
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
 	go fsm.FsmRun(device)
-
+	
 	hraExecutable := ""
 	switch runtime.GOOS {
 	case "linux":
@@ -40,8 +38,10 @@ func main() {
 	case "windows":
 		hraExecutable = "hall_request_assigner.exe"
 	default:
-		panic("OS not supported")
+		panic("OS not supported") 
 	}
+	network.InitStateByBroadcastingNetworkAndWait()
+	
 
 	input := hall_request_assigner.HRAInput{
 		HallRequests: [][2]bool{{false, false}, {true, false}, {false, false}, {false, true}},
@@ -93,8 +93,7 @@ func main() {
 	}
 
 	select {}
-
-	// myState := InitStateByBroadcastingNetworkAndWait()
+	//myState := InitStateByBroadcastingNetworkAndWait()
 	// If myState == PRIMARY:
 	//		ActiveElevators <- getAllElevatorStates()
 	// 		sendOverNetworkToSecondary(ActiveElevators)

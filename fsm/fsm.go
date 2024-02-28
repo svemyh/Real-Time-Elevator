@@ -39,9 +39,7 @@ func SetAllLights() {
 }
 
 func FsmOnInitBetweenFloors() {
-	//outputDevice.SetMotorDirection(elevio.MD_Down)
-	elevio.SetMotorDirection(elevio.D_Down) // from MD_Down to D_Down
-	//elevio.SetMotorDirection(elevio.MotorDirection(elevio.D_Stop)) //test
+	elevio.SetMotorDirection(elevio.D_Down) 
 	elevatorState.Dirn = elevio.D_Down
 	elevatorState.Behaviour = elevator.EB_Moving
 }
@@ -54,7 +52,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 	case elevator.EB_DoorOpen:
 		println("Door Open")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
-			timer.TimerStart(5) // it had elevator.Config.DoorOpenDurationS.Seconds() as argument?
+			timer.TimerStart(5)
 		} else {
 			elevatorState.Requests[btnFloor][btnType] = true
 		}
@@ -66,16 +64,13 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 	case elevator.EB_Idle:
 		println("Idle")
 		elevatorState.Requests[btnFloor][btnType] = true
-		//pair := requests.ChooseDirection(elevator)
-		//elevator.Dirn = pair.Dirn
-		//elevator.Behaviour = pair.Behaviour
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
 			fmt.Println("EB_DoorOpen")
 			outputDevice.DoorLight = true
-			timer.TimerStart(5) // it had elevator.Config.DoorOpenDurationS.Seconds() as argument?
+			timer.TimerStart(5) 
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 
 		case elevator.EB_Moving:
@@ -98,15 +93,13 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 func FsmOnFloorArrival(newFloor int) {
 	fmt.Printf("\nArrived at floor %d\n", newFloor)
 	elevatorState.Floor = newFloor
-	//outputDevice.SetFloorIndicator(newFloor)
-	// Additional logic based on elevator state... not finished
 	elevio.SetFloorIndicator(elevatorState.Floor)
 
 	switch elevatorState.Behaviour {
 	case elevator.EB_Moving:
 		if requests.ShouldStop(elevatorState) {
 			fmt.Println("Should stop")
-			elevio.SetMotorDirection(elevio.D_Stop) // from MD_Stop to D_Stop
+			elevio.SetMotorDirection(elevio.D_Stop) 
 			elevio.SetDoorOpenLamp(true)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
@@ -123,13 +116,9 @@ func FsmOnFloorArrival(newFloor int) {
 
 func FsmOnDoorTimeout() {
 	fmt.Println("\nDoor timeout")
-	// Additional logic based on elevator state... finished?
+
 	switch elevatorState.Behaviour {
 	case elevator.EB_DoorOpen:
-		// pair := requests.ChooseDirection(elevatorState) I don't know why this won't work. Pls fix
-		// elevatorState.Dirn = pair.Dirn 	// This part doesn't get used anyways, but wouldn't have worked since ChooseDirection returns motordirection
-		// elevatorState.Behaviour = pair.Behaviour
-
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
@@ -145,7 +134,7 @@ func FsmOnDoorTimeout() {
 		case elevator.EB_Idle:
 			fmt.Println("EB idle")
 			elevio.SetDoorOpenLamp(false)
-			elevio.SetMotorDirection(elevio.D_Stop) // MD_Stop to D_Stop
+			elevio.SetMotorDirection(elevio.D_Stop) 
 		}
 
 	default:
@@ -164,6 +153,7 @@ func FsmRun(device elevio.ElevInputDevice) {
 
 	// Polling for new actions/events of the system.
 	for {
+		
 		select {
 		case floor := <-device.FloorSensorCh:
 			fmt.Println("Floor Sensor:", floor)
@@ -182,9 +172,9 @@ func FsmRun(device elevio.ElevInputDevice) {
 
 		default:
 			// No action - prevents blocking on channel reads
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 		}
-		if timer.TimerTimedOut() { // should be reworked into a channel
+		if timer.TimerTimedOut() { // should be reworked into a channel. TBC
 			timer.TimerStop()
 			FsmOnDoorTimeout()
 		}
