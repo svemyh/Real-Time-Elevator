@@ -12,24 +12,24 @@ import (
 //go network.Reciever(receiverChan, "localhost:20013")
 
 func Receiver(ctx context.Context, receiver chan<- string, addressString string) {
-	fmt.Println("Breakpoints")
+	fmt.Println("Breakpoint: 0")
 	addr, err := net.ResolveUDPAddr("udp", addressString) //addressString to actual address(server/)
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
 	}
 
-	fmt.Println("Breakpoints")
+	fmt.Println("Breakpoint: 1")
 	// TODO: recvSock = new Socket(udp). Bind address we want to use to the socket
 	recvSock, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		fmt.Println("Error listening:", err)
 		return
 	}
-	//defer recvSock.Close() // Close recvSock AFTER surrounding main function completes
+	defer recvSock.Close() // Close recvSock AFTER surrounding main function completes
 
 	buffer := make([]byte, 1024) // a buffer where the received network data is stored byte[1024] buffer
-	fmt.Println("Breakpoints")
+	fmt.Println("Breakpoint: 2")
 
 	go func() {
 		<-ctx.Done()
@@ -39,14 +39,15 @@ func Receiver(ctx context.Context, receiver chan<- string, addressString string)
 	for {
 
 		buffer = make([]byte, 1024)
+		fmt.Println("Breakpoint: 3")
 
 		numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
 		if err != nil {
 			fmt.Println("Error readFromUDP:", err)
 			return
 		}
-		fmt.Println("Breakpoints")
 		message := string(buffer[:numBytesReceived])
+		fmt.Println("Breakpoint: 4")
 
 		localIP, err := net.ResolveUDPAddr("udp", addressString) // localIP
 		if err != nil {
@@ -66,7 +67,7 @@ func Receiver(ctx context.Context, receiver chan<- string, addressString string)
 }
 
 func Sender(port string) {
-	laddr, err := net.ResolveUDPAddr("udp", "localhost:20017") // localIP
+	laddr, err := net.ResolveUDPAddr("udp", "localhost:20015") // localIP
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
@@ -100,7 +101,7 @@ func Sender(port string) {
 	}
 }
 
-func InitStateByBroadcastingNetworkAndWait() {
+func InitProcessPair() string { // this should only return if master or slave, but I(Anton) am testing things using this function
 	var (
 		currentRole = "Slave" // Start as receiver
 	)
@@ -114,16 +115,24 @@ func InitStateByBroadcastingNetworkAndWait() {
 	select {
 	case msg := <-receiverChan:
 		log.Println("Received message:", msg)
-	case <-time.After(3 * time.Second):
+		return currentRole
+	// return 0. set local(?) elevatorsystem to Slave
+
+	case <-time.After(3 * time.Second): // finn en måte å bruke setReadDeadline på. Resten funker
 		if currentRole == "Slave" {
 			log.Println("No message received, becoming master...")
 			cancel() // should be redundant, but for some awkward reason it's not
-			currentRole = "Master"
+			currentRole = "PRIMARY"
+			return currentRole
+			/*
 			for {
-				go Sender("localhost:20017")
-				time.Sleep(5 * time.Second)
+				Sender("localhost:20017")
+				log.Println(currentRole)
+				time.Sleep(2 * time.Second)
 				// master do master things
 			}
+			*/
 		}
 	}
+	return currentRole
 }

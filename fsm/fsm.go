@@ -178,5 +178,7 @@ func FsmRun(device elevio.ElevInputDevice) {
 			timer.TimerStop()
 			FsmOnDoorTimeout()
 		}
+		
+		
 	}
 }

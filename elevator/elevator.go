@@ -24,7 +24,7 @@ type Config struct {
 	DoorOpenDurationS   float64
 }
 
-type Elevator struct {
+type Elevator struct { // add local ip mby?
 	Floor     int
 	Dirn      elevio.Dirn
 	Requests  [elevio.N_Floors][elevio.N_Buttons]bool
