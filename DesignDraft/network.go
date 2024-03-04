@@ -1,7 +1,8 @@
 //DRAFT FILE FOR NETWORK
 
-func TCPReadElevatorStates(conn, StateUpdateCh) {
+func TCPReadElevatorStates(conn, StateUpdateCh, OrderCompleteCh) {
 	//TODO:Read the states and store in a buffer
+	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
 }
 
