@@ -13,7 +13,7 @@ func RunPrimaryBackup(necessarychannels...) {
 	if AmIPrimary() {
 		PrimaryRoutine()
 	} else { 
-		go run TCPListenForNewPrimary() //Checks the event that a backup has become a new primary and wants to establish connection
+		go run TCPListenForNewPrimary() //Checks the event that a backup has become a new primary and wants to establish connection. This go routine should be shut down at some point
 		TCPDialPrimary()
 		TCPListenForBackupPromotion() //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
 		BackupRoutine()               //Will never pass prev function unless primary has dialed you to become backup
@@ -26,7 +26,6 @@ Decides if a computer running on network should become primary.
 Listens for a broadcast from primary for a RANDOMIZED SMALL AMOUNT OF TIME
 (if not two elevators can decide to become primary at same time if started at same time)
 If nothing is heard in this time ---> returns True
-
 Return:
 bool
 */

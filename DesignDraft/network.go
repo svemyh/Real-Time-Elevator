@@ -12,7 +12,7 @@ func TCPListenForNewPrimary() {
 
 func TCPListenForNewElevators(){
 	//listen for new elevators on TCP port
-	//when connection established run the go routine to start reading data from the conn
+	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
 	go run TCPReadElevatorStates(stateUpdateCh)
 }
 
