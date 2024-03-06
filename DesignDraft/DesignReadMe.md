@@ -7,10 +7,10 @@ The code revolves around running the local elevator FSM and the PrimaryBackup bo
 
 #### Major aspects that are missing and need to be solved in design
 1) No handling of a TCP conn disconnecting   ---> Could potentially add an LocalElevatorLost channel and have a goroutine that always checks what elevators are active (se kok)
-2) No solution to potentially having 2 masters on network (should be easy to integrate tho)
-3) No handling of elevator loosing connection and reconnecting to network VEEEELDIG VIKTIG!!!!!!
+2) No solution to potentially having 2 masters on network (should be easy to integrate tho) DONE
+3) No handling of elevator loosing connection and reconnecting to network VEEEELDIG VIKTIG!!!!!! DONE
 4) No idea how most of network function will work
-5) Not started to add the conns to FSM module (should be easy)
+5) Not started to add the conns to FSM module (should be easy) -will maybe include some mutexes assure that we update local state before sending it on the conn?
 
 #### Potential places we can start to code step by step
 	1) Sett opp en grunnlegende network modul (lag en server function, lag en client function, AmIPrimary(), broadcast på UDP ...) så vi kan ta i bruk i primary / secondary modul
