@@ -3,8 +3,7 @@ package main
 import (
 	"elevator/elevio"
 	"elevator/fsm"
-	"elevator/network"
-	
+
 	"fmt"
 )
 
@@ -27,8 +26,6 @@ func main() {
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
 	go fsm.FsmRun(device)
-
-	fmt.Println(network.InitProcessPair())
 
 	/*
 
@@ -91,99 +88,91 @@ func main() {
 			}
 	*/
 	select {}
-// 	InitLocalFSM()
-// 	if InitProcessPair() == "PRIMARY" {
-// 			go PrimaryRoutine()
-// 	}
-// 	else {
-// 		 establishConnectionWithPrimary()
-	  
-// 	}
+	// 	InitLocalFSM()
+	// 	if InitProcessPair() == "PRIMARY" {
+	// 			go PrimaryRoutine()
+	// 	}
+	// 	else {
+	// 		 establishConnectionWithPrimary()
 
-// 	func PrimaryRoutine(ActiveElevators) {
-			
-			
-	
-// 			ActiveElevators[type array of structs Elevator] <- getAllACtiveElevatorStates()
-		
-// 			Secondary = ActiveElevators[0]
-			
-// 			sendPromotionMessageToSecondary(Secondary.MyAddress)
-	
-// 			for {							// continue after acknowledgement
-// 				ack <- network_recieved_ack
-// 				time.sleep()
-// 			}
-	
-// 			sendStatesOverNetworkToSecondary(ActiveElevators, Secondary.MyAddress)
-// 			for {
-// 				ack <- network_recieved_ack
-// 				time.sleep()
-// 			}
-	
-// 	     NewElevatorOrders = HallRequestAssigner(ActiveElevators[type array of structs Elevator])
-// 			DistributeOrdersOverNetwork(NewElevatorOrders)
-// 	}
-	
-// 	func SecondaryRoutine() {
-// 			initialize SecondarySinActiveElevators
-// 			go ListenToPrimary(chan messageCh, address)
-// 			case:
-// 				ActiveElevators<-messageCh:
-// 			SecondarySinActiveElevators = ActiveElevators
-			
-	
-	
-	
-	
-// 	}
-	
-// 	func RegularRoutine() {
-// 			go ListenForPromotion(msg chan<-string) 
-// 			for {
-// 				select {
-// 			case: promotion <- msg
-// 				if promotion == "You are now secondary":
-// 					cancel ListenForPromotion()
-// 					go SecondaryRoutine()
-// 		}
-// 	}	
-			
-	
-// 			// Do nothing
-// 	}
+	// 	}
 
-// 	TODO:
+	// 	func PrimaryRoutine(ActiveElevators) {
 
-// 	func InitMyState()  {
-	
-	
-// 	}
+	// 			ActiveElevators[type array of structs Elevator] <- getAllACtiveElevatorStates()
 
-// 	func DistributeOrdersOverNetwork(NewElevatorOrders):
-// 			// TODO: Make this routine function in parallell instead of in series
+	// 			Secondary = ActiveElevators[0]
 
-// 			for i in ActiveElevators:
-// 				sendOverNetwork(NewElevatorOrders[i])
-// 				for {
-// 					ack <- network_reciever
-// 					time.sleep()
-// 				}
-	
-// 			for i in ActiveElevators:
-// 				sendOverNetwork(buttonlights)
-// 				for {
-// 					ack <- network_reciever
-// 					time.sleep()
-// 				}
-// 	}
-	
-// 	chan networkReciever
-// 	func getAllElevatorStates(chan networkReciever)
+	// 			sendPromotionMessageToSecondary(Secondary.MyAddress)
 
-// 	case newEvent := <- networkReciever
-// 		 (MyAdress, elevio.elevator)
-// 	  ActiveElevators("MYIP") = elevio.elevator
+	// 			for {							// continue after acknowledgement
+	// 				ack <- network_recieved_ack
+	// 				time.sleep()
+	// 			}
 
-// }
+	// 			sendStatesOverNetworkToSecondary(ActiveElevators, Secondary.MyAddress)
+	// 			for {
+	// 				ack <- network_recieved_ack
+	// 				time.sleep()
+	// 			}
+
+	// 	     NewElevatorOrders = HallRequestAssigner(ActiveElevators[type array of structs Elevator])
+	// 			DistributeOrdersOverNetwork(NewElevatorOrders)
+	// 	}
+
+	// 	func SecondaryRoutine() {
+	// 			initialize SecondarySinActiveElevators
+	// 			go ListenToPrimary(chan messageCh, address)
+	// 			case:
+	// 				ActiveElevators<-messageCh:
+	// 			SecondarySinActiveElevators = ActiveElevators
+
+	// 	}
+
+	// 	func RegularRoutine() {
+	// 			go ListenForPromotion(msg chan<-string)
+	// 			for {
+	// 				select {
+	// 			case: promotion <- msg
+	// 				if promotion == "You are now secondary":
+	// 					cancel ListenForPromotion()
+	// 					go SecondaryRoutine()
+	// 		}
+	// 	}
+
+	// 			// Do nothing
+	// 	}
+
+	// 	TODO:
+
+	// 	func InitMyState()  {
+
+	// 	}
+
+	// 	func DistributeOrdersOverNetwork(NewElevatorOrders):
+	// 			// TODO: Make this routine function in parallell instead of in series
+
+	// 			for i in ActiveElevators:
+	// 				sendOverNetwork(NewElevatorOrders[i])
+	// 				for {
+	// 					ack <- network_reciever
+	// 					time.sleep()
+	// 				}
+
+	// 			for i in ActiveElevators:
+	// 				sendOverNetwork(buttonlights)
+	// 				for {
+	// 					ack <- network_reciever
+	// 					time.sleep()
+	// 				}
+	// 	}
+
+	// 	chan networkReciever
+	// 	func getAllElevatorStates(chan networkReciever)
+
+	// 	case newEvent := <- networkReciever
+	// 		 (MyAdress, elevio.elevator)
+	// 	  ActiveElevators("MYIP") = elevio.elevator
+
+	// }
 }

@@ -39,3 +39,11 @@ will need ack here aswell as hall req button lights need to be syncronized acros
 func DistributeHallButtonLights(assignedHallReq) {
 	//TODO: all
 }
+
+func TCPDialPrimary() {
+	// TODO: all
+}
+
+func TCPListenForBackupPromotion() {
+	//TODO: all
+}
