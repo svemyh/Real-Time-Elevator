@@ -3,7 +3,6 @@ package fsm
 import (
 	"elevator/elevator"
 	"elevator/elevio"
-	"elevator/network"
 	"elevator/requests"
 	"elevator/timer"
 	"fmt"
@@ -147,7 +146,7 @@ func FsmOnDoorTimeout() {
 
 func FsmRun(device elevio.ElevInputDevice) {
 	var prev int = -1
-	
+	log.Println("is in fsm")
 
 	if f := elevio.GetFloor(); f == -1 {
 		FsmOnInitBetweenFloors()

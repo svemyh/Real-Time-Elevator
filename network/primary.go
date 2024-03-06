@@ -1,9 +1,17 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net"
+	"time"
 )
+
+type Primary struct {
+	Ip       string
+	lastSeen time.Time
+}
 
 /*
 func RunPrimaryBackup(necessarychannels...) {
@@ -26,22 +34,90 @@ If nothing is heard in this time ---> returns True
 Return:
 bool
 */
-func AmIPrimary() bool {
-	if InitProcessPair() == "PRIMARY" {
-		log.Println("AmIPrimary? Yes")
-		return true
+
+func UDPBroadCastPrimaryRole(ctx context.Context, port string) {
+	//def our local address
+	laddr, err := net.ResolveUDPAddr("udp", ":0") // Using the zero-port
+	if err != nil {
+		fmt.Println("Error resolving UDP address:", err)
+		return
 	}
-	log.Println("AmIBackup?Yes")
+
+	//def remote addr
+	raddr, err := net.ResolveUDPAddr("udp", port) //addressString to actual address(server/)
+	if err != nil {
+		fmt.Println("Error resolving UDP address:", err)
+		return
+	}
+
+	//create a connection to raddr through a socket object
+	sockConn, err := net.DialUDP("udp", laddr, raddr)
+
+	defer sockConn.Close()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			message := "I'm Primary!"
+			sockConn.Write([]byte(message))
+			//_, err := sockConn.Write([]byte(message))
+			//fmt.Printf("Broadcasting: %s\n", message)
+			//if err != nil {
+			//	log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
+			//}
+			time.Sleep(1 * time.Second)
+		}
+	}
+}
+
+func AmIPrimary(addressString string) bool {
+	addr, err := net.ResolveUDPAddr("udp", addressString)
+	if err != nil {
+		log.Printf("Error resolving UDP address: %v\n", err)
+		return false
+	}
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		log.Printf("Error listening on UDP: %v\n", err)
+		return false
+	}
+	defer conn.Close()
+
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	buffer := make([]byte, 1024)
+	_, _, err = conn.ReadFromUDP(buffer)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() { // assert error to net.Error as this type can be checked as a timeout error
+			log.Println("No message received, becoming primary...")
+			return true
+		}
+		log.Printf("Error reading from UDP: %v\n", err)
+	}
+	log.Println("Received broadcast from primary, remaining as client...")
 	return false
 }
 
-/*
- */
+func TCPListenForNewElevators() {
+	//listen for new elevators on TCP port
+	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
+	//go TCPReadElevatorStates(stateUpdateCh)
+}
+
 func PrimaryRoutine() { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
-	fmt.Println("PrimaryRoutine")
-	go UDPBroadCastPrimaryRole(":20017") //Continously broadcast that you are a primary on UDP
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go UDPBroadCastPrimaryRole(ctx, detectionPort) //Continously broadcast that you are a primary on UDP
+	//TODO: if list of active elevators > 1, try to use the transmitter or receiver
+	for {	
+		Transmitter(detectionPort)
+		time.Sleep(1 * time.Second)
+	}
 	//go run TCPListenForNewElevators() //Continously listen if new elevator entring networks is trying to establish connection
 	//go run HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators)
 }

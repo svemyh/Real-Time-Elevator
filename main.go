@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"elevator/elevio"
 	"elevator/fsm"
 	"elevator/network"
@@ -25,7 +26,10 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	go network.InitNetwork(network.AmIPrimary())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go network.InitNetwork(ctx)
 
 	go fsm.FsmRun(device)
 
