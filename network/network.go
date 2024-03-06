@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"time"
 )
@@ -68,45 +67,6 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 			}
 		}
 	}
-}
-
-func InitProcessPair() string {
-	var (
-		currentRole = "SLAVE" // Start as a slave.
-	)
-
-	receiverChan := make(chan string)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go InitReceiver(ctx, receiverChan, detectionPort)
-
-	messageReceived := false
-	timer := time.NewTimer(3 * time.Second) // set to 3 seconds
-	for {
-		select {
-		case msg := <-receiverChan:
-			log.Println("Received message:", msg)
-			messageReceived = true
-			//timer.Reset(3 * time.Second) // Reset the timer if a message is received.
-			return currentRole
-		case <-timer.C:
-			if !messageReceived {
-				// No message was received within the time frame.
-				log.Println("No message received, becoming master...")
-				currentRole = "PRIMARY"
-				cancel() // Stop the Receiver goroutine.
-				return currentRole
-			}
-		case <-ctx.Done():
-			return currentRole
-		}
-		if currentRole == "PRIMARY" {
-			break
-		}
-		messageReceived = false
-	}
-	return currentRole
 }
 
 func InitNetwork(isPrimary bool) {
