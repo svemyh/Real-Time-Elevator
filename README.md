@@ -3,8 +3,6 @@ Elevator Project
 
 Create software for controlling `n` elevators working in parallel across `m` floors.
 
-Be reasonable: There may be semantic hoops that you can jump through to create something that is "technically correct". Do not hesitate to contact us if you feel that something is ambiguous or missing from these requirements.
-
 Main requirements
 -----------------
 
@@ -84,17 +82,3 @@ How the hall (call up, call down) buttons work when the elevator is disconnected
 
 What the stop button does
  - The stop button functionality (if/when implemented) is up to you
-
-Recommendations
----------------
-
-Start with `1 <= n <= 3` elevators, and `m == 4` floors. Try to avoid hard-coding these values: You should be able to add a fourth elevator with no extra configuration, or change the number of floors with minimal configuration. You do, however, not need to test for `n > 3` and `m != 4`.
-
-If you need to specify the identifier of an elevator when it starts, we recommend that you implement the command-line switch `--id <number>`.
-
-Additional resources
---------------------
-
-Go to [the project resources repository](https://github.com/TTK4145/Project-resources) to find more resources for doing the project. This information is not required for the project and is therefore maintained separately.
-
-See [Testing from home](/testing_from_home.md) document on how to test with unreliable networking on a single computer.
