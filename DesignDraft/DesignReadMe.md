@@ -8,7 +8,7 @@ The code revolves around running the local elevator FSM and the PrimaryBackup bo
 #### Major aspects that are missing and need to be solved in design
 1) No handling of a TCP conn disconnecting   ---> Could potentially add an LocalElevatorLost channel and have a goroutine that always checks what elevators are active (se kok)
 2) No solution to potentially having 2 masters on network (should be easy to integrate tho)
-3) No handling of elevator reconnecting to network
+3) No handling of elevator loosing connection and reconnecting to network VEEEELDIG VIKTIG!!!!!!
 4) No idea how most of network function will work
 5) Not started to add the conns to FSM module (should be easy)
 
