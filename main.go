@@ -33,6 +33,8 @@ func main() {
 
 	go fsm.FsmRun(device)
 
+	go network.RestartOnReconnect()
+
 	//establishConnectionWithPrimary() // TCP
 
 	/*
