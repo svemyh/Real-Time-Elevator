@@ -21,5 +21,6 @@ BackupRoutine() {
 	//TODO: Moniter that primary connection is alive
 	//TODO: read states sendt through primary connection (make an array to contain -> activeElevators)
 	//TODO: if backup unresponsive --> BecomePrimary(activeElevators)
+	
 }
 

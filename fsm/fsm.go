@@ -3,9 +3,11 @@ package fsm
 import (
 	"elevator/elevator"
 	"elevator/elevio"
+	"elevator/network"
 	"elevator/requests"
 	"elevator/timer"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -39,7 +41,7 @@ func SetAllLights() {
 }
 
 func FsmOnInitBetweenFloors() {
-	elevio.SetMotorDirection(elevio.D_Down) 
+	elevio.SetMotorDirection(elevio.D_Down)
 	elevatorState.Dirn = elevio.D_Down
 	elevatorState.Behaviour = elevator.EB_Moving
 }
@@ -70,7 +72,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 		case elevator.EB_DoorOpen:
 			fmt.Println("EB_DoorOpen")
 			outputDevice.DoorLight = true
-			timer.TimerStart(5) 
+			timer.TimerStart(5)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 
 		case elevator.EB_Moving:
@@ -87,7 +89,6 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 	SetAllLights()
 
 	fmt.Println("\nNew state:")
-	//elevatorPrint(elevator)
 }
 
 func FsmOnFloorArrival(newFloor int) {
@@ -99,11 +100,11 @@ func FsmOnFloorArrival(newFloor int) {
 	case elevator.EB_Moving:
 		if requests.ShouldStop(elevatorState) {
 			fmt.Println("Should stop")
-			elevio.SetMotorDirection(elevio.D_Stop) 
+			elevio.SetMotorDirection(elevio.D_Stop)
 			elevio.SetDoorOpenLamp(true)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
-			SetAllLights() // specific floor?
+			SetAllLights()
 			elevatorState.Behaviour = elevator.EB_DoorOpen
 		}
 	default:
@@ -134,7 +135,7 @@ func FsmOnDoorTimeout() {
 		case elevator.EB_Idle:
 			fmt.Println("EB idle")
 			elevio.SetDoorOpenLamp(false)
-			elevio.SetMotorDirection(elevio.D_Stop) 
+			elevio.SetMotorDirection(elevio.D_Stop)
 		}
 
 	default:
@@ -146,6 +147,10 @@ func FsmOnDoorTimeout() {
 
 func FsmRun(device elevio.ElevInputDevice) {
 	var prev int = -1
+	log.Println("is here")
+
+	network.InitNetwork(network.AmIPrimary())
+	log.Println("is here")
 
 	if f := elevio.GetFloor(); f == -1 {
 		FsmOnInitBetweenFloors()
@@ -153,7 +158,7 @@ func FsmRun(device elevio.ElevInputDevice) {
 
 	// Polling for new actions/events of the system.
 	for {
-		
+
 		select {
 		case floor := <-device.FloorSensorCh:
 			fmt.Println("Floor Sensor:", floor)
@@ -178,7 +183,6 @@ func FsmRun(device elevio.ElevInputDevice) {
 			timer.TimerStop()
 			FsmOnDoorTimeout()
 		}
-		
-		
+
 	}
 }

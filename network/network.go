@@ -8,18 +8,25 @@ import (
 	"time"
 )
 
-//receiverChan := make(chan string)
-//go network.Reciever(receiverChan, "localhost:20013")
+var detectionPort string = ":20017"
 
-func Receiver(ctx context.Context, receiver chan<- string, addressString string) {
-	fmt.Println("Breakpoint: 0")
+/*
+type RXChannels struct {
+	StateUpdateCh       chan types.ElevState      `addr:"stateupdatech"`
+	RegisterOrderCh     chan types.OrderEvent     `addr:"registerorderch"`
+	OrdersFromMasterCh  chan types.GlobalOrderMap `addr:"ordersfrommasterch"`
+	OrderCopyRequestCh  chan bool                 `addr:"ordercopyrequestch"`
+	OrderCopyResponseCh chan types.GlobalOrderMap `addr:"ordercopyresponsech"`
+}
+*/
+
+func InitReceiver(ctx context.Context, receiver chan<- string, addressString string) {
 	addr, err := net.ResolveUDPAddr("udp", addressString) //addressString to actual address(server/)
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
 	}
 
-	fmt.Println("Breakpoint: 1")
 	// TODO: recvSock = new Socket(udp). Bind address we want to use to the socket
 	recvSock, err := net.ListenUDP("udp", addr)
 	if err != nil {
@@ -29,110 +36,161 @@ func Receiver(ctx context.Context, receiver chan<- string, addressString string)
 	defer recvSock.Close() // Close recvSock AFTER surrounding main function completes
 
 	buffer := make([]byte, 1024) // a buffer where the received network data is stored byte[1024] buffer
-	fmt.Println("Breakpoint: 2")
-
-	go func() {
-		<-ctx.Done()
-		recvSock.Close() // Close the socket when context is cancelled
-	}()
 
 	for {
-
-		buffer = make([]byte, 1024)
-		fmt.Println("Breakpoint: 3")
-
-		numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
-		if err != nil {
-			fmt.Println("Error readFromUDP:", err)
+		select {
+		case <-ctx.Done():
 			return
-		}
-		message := string(buffer[:numBytesReceived])
-		fmt.Println("Breakpoint: 4")
+		default:
+			recvSock.SetReadDeadline(time.Now().Add(1 * time.Second))
+			buffer = make([]byte, 1024)
 
-		localIP, err := net.ResolveUDPAddr("udp", addressString) // localIP
-		if err != nil {
-			fmt.Println("Error resolving UDP address:", err)
-			return
-		}
+			numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
+			if err != nil {
+				fmt.Println("Error readFromUDP:", err)
+				return
+			}
+			message := string(buffer[:numBytesReceived])
+			fmt.Println("Breakpoint: 2")
 
-		if string(fromWho.IP) != string(localIP.IP) {
-			fmt.Println(message)
-			//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
-			//receiver <- messageInitStateByBroadcastingNetworkAndWait()
-		} else {
-			fmt.Println("rand message is: ", message)
-			receiver <- message
+			localIP, err := net.ResolveUDPAddr("udp", addressString) // localIP
+			if err != nil {
+				fmt.Println("Error resolving UDP address:", err)
+				return
+			}
+
+			if string(fromWho.IP) != string(localIP.IP) {
+				fmt.Println(message)
+				//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
+				//receiver <- messageInitStateByBroadcastingNetworkAndWait()
+			} else {
+				fmt.Println("rand message is: ", message)
+				receiver <- message
+			}
 		}
 	}
 }
 
-func Sender(port string) {
-	laddr, err := net.ResolveUDPAddr("udp", "localhost:20015") // localIP
-	if err != nil {
-		fmt.Println("Error resolving UDP address:", err)
-		return
-	}
-
-	//def remote addr
-	raddr, err := net.ResolveUDPAddr("udp", port) //addressString to actual address(server/)
-	if err != nil {
-		fmt.Println("Error resolving UDP address:", err)
-		return
-	}
-
-	//create a connection to raddr through a socket object
-	sockConn, _ := net.DialUDP("udp", laddr, raddr)
-
-	defer sockConn.Close()
-
-	//Create an empty buffer to to filled
-	buffer := make([]byte, 1024)
-	//oob := make([]byte, 1024)
-
-	n := copy(buffer, []byte("Hello World!"))
-
-	fmt.Printf("copied %d bytes to the buffer: %s\n", n, buffer[:n])
-
-	n, err = sockConn.Write(buffer)
-
-	if err != nil {
-		fmt.Println("Error resolving WriteMsgUDP", err)
-		return
-	}
-}
-
-func InitProcessPair() string { // this should only return if master or slave, but I(Anton) am testing things using this function
+func InitProcessPair() string {
 	var (
-		currentRole = "Slave" // Start as receiver
+		currentRole = "Slave" // Start as a slave.
 	)
 
 	receiverChan := make(chan string)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go Receiver(ctx, receiverChan, "localhost:20017")
+	go InitReceiver(ctx, receiverChan, ":20017")
 
-	select {
-	case msg := <-receiverChan:
-		log.Println("Received message:", msg)
-		return currentRole
-	// return 0. set local(?) elevatorsystem to Slave
-
-	case <-time.After(3 * time.Second): // finn en måte å bruke setReadDeadline på. Resten funker
-		if currentRole == "Slave" {
-			log.Println("No message received, becoming master...")
-			cancel() // should be redundant, but for some awkward reason it's not
-			currentRole = "PRIMARY"
-			return currentRole
-			/*
-			for {
-				Sender("localhost:20017")
-				log.Println(currentRole)
-				time.Sleep(2 * time.Second)
-				// master do master things
+	messageReceived := false
+	timer := time.NewTimer(3 * time.Second) // set to 3 seconds
+	for {
+		select {
+		case msg := <-receiverChan:
+			log.Println("Received message:", msg)
+			messageReceived = true
+			timer.Reset(3 * time.Second) // Reset the timer if a message is received.
+		case <-timer.C:
+			if !messageReceived {
+				// No message was received within the time frame.
+				log.Println("No message received, becoming master...")
+				currentRole = "PRIMARY"
+				cancel() // Stop the Receiver goroutine.
+				return currentRole
 			}
-			*/
+		case <-ctx.Done():
+			return currentRole
 		}
+		if currentRole == "PRIMARY" {
+			break
+		}
+		messageReceived = false
 	}
 	return currentRole
 }
+
+func InitNetwork(primaryOrBackup bool) {
+	if primaryOrBackup == true { // do primary things
+		PrimaryRoutine()
+		// go HandlePrimaryTasks
+		return
+	}
+	BackupRoutine()
+	return
+}
+
+//receiverChan := make(chan string)
+//go network.Reciever(receiverChan, "localhost:20013")
+
+/*
+
+
+func TCPReadElevatorStates(conn, StateUpdateCh, OrderCompleteCh) {
+	//TODO:Read the states and store in a buffer
+	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
+	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
+}
+
+func TCPListenForNewPrimary() {
+	//listen for new primary on tcp port and accept
+}
+
+func TCPListenForNewElevators(port string, listenerconnection, receiverchannels){
+	//listen for new elevators on TCP port
+	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
+	go run TCPReadElevatorStates(stateUpdateCh)
+
+	allClients := make(map[net.Conn]string)
+	newConnections := make(chan net.Conn)
+	deadConnections := make(chan net.Conn)
+	messages := make(chan connectionMsg)
+
+	go acceptConnections(connection, newConnections)
+
+	for {
+		select {
+		case conn := <-newConnections:
+			addr := conn.RemoteAddr().String()
+			fmt.Printf("Accepted new client, %v\n", addr)
+			allClients[conn] = addr
+			go read(conn, messages, deadConnections)
+
+		case conn := <-deadConnections:
+			fmt.Printf("Client %v disconnected", allClients[conn])
+			delete(allClients, conn)
+
+		case message := <-messages:
+			go decodeMsg(message, rxChannels)
+		}
+	}
+}
+
+func acceptConnections(server net.Listener, newConnections chan net.Conn) {
+	for {
+		conn, err := server.Accept()
+		if err != nil {
+			fmt.Println(err)
+		}
+		newConnections <- conn
+	}
+}
+*/
+
+/*
+distribute all hall requests
+needs to receive ack from each elevator sendt to.
+probably need to give it the TCP conn array
+
+func DistributeHallRequests(assignedHallReq) {
+	//TODO: all
+}
+
+
+distribute all button lights assosiated with each hallreq at each local elevator
+needs to receive ack from each elevator sendt to.
+probably need to give it the TCP conn array.
+will need ack here aswell as hall req button lights need to be syncronized across computers
+func DistributeHallButtonLights(assignedHallReq) {
+	//TODO: all
+}
+*/

@@ -19,6 +19,7 @@ func TCPListenForNewElevators(){
 
 func UDPBroadCastPrimaryRole() {
 	//TODO: broadcast that you are primary 
+	
 }
 
 /*
