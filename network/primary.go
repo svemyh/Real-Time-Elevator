@@ -30,9 +30,9 @@ Return:
 bool
 */
 
-func UDPBroadCastPrimaryRole(port string) {
+func UDPBroadCastPrimaryRole(ctx context.Context, port string) {
 	//def our local address
-	laddr, err := net.ResolveUDPAddr("udp", ":10000") // localIP
+	laddr, err := net.ResolveUDPAddr("udp", ":0") // localIP
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
@@ -51,58 +51,47 @@ func UDPBroadCastPrimaryRole(port string) {
 	defer sockConn.Close()
 
 	for {
-
-		//Create an empty buffer to to filled
-		buffer := make([]byte, 1024)
-		//oob := make([]byte, 1024)
-
-		n := copy(buffer, []byte("Im Primary!"))
-
-		fmt.Printf("copied %d bytes to the buffer from primary: %s\n", n, buffer[:n])
-
-		n, err = sockConn.Write(buffer)
-
-		if err != nil {
-			fmt.Println("Error resolving WriteMsgUDP: No one is listening")
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			message := "I'm Primary!"
+			_, err := sockConn.Write([]byte(message))
+			fmt.Printf("Broadcasting: %s\n", message)
+			if err != nil {
+				log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
+			}
+			time.Sleep(1 * time.Second)
 		}
-		time.Sleep(1 * time.Second)
 	}
 }
 
-func AmIPrimary() bool {
-	currentRole := false // Start as a slave.
-
-	receiverChan := make(chan string)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go InitReceiver(ctx, receiverChan, ":20017")
-
-	messageReceived := false
-	timer := time.NewTimer(3 * time.Second) // set to 3 seconds
-	for {
-		select {
-		case msg := <-receiverChan:
-			log.Println("Received message:", msg)
-			messageReceived = true
-			return currentRole
-		case <-timer.C:
-			if !messageReceived {
-				// No message was received within the time frame.
-				log.Println("No message received, becoming master...")
-				currentRole = false
-				cancel() // Stop the Receiver goroutine.
-				return currentRole
-			}
-		case <-ctx.Done():
-			return currentRole
-		}
-		if currentRole {
-			break
-		}
-		messageReceived = false
+func AmIPrimary(addressString string) bool {
+	addr, err := net.ResolveUDPAddr("udp", addressString)
+	if err != nil {
+		log.Printf("Error resolving UDP address: %v\n", err)
+		return false
 	}
-	return currentRole
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		log.Printf("Error listening on UDP: %v\n", err)
+		return false
+	}
+	defer conn.Close()
+
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	buffer := make([]byte, 1024)
+	_, _, err = conn.ReadFromUDP(buffer)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			log.Println("No message received, becoming primary...")
+			return true
+		}
+		log.Printf("Error reading from UDP: %v\n", err)
+	}
+	log.Println("Received broadcast from primary, remaining as client...")
+	return false
 }
 
 /*
@@ -110,8 +99,10 @@ func AmIPrimary() bool {
 func PrimaryRoutine() { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
-	fmt.Println("PrimaryRoutine")
-	go UDPBroadCastPrimaryRole(detectionPort) //Continously broadcast that you are a primary on UDP
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go UDPBroadCastPrimaryRole(ctx, detectionPort) //Continously broadcast that you are a primary on UDP
 	//go run TCPListenForNewElevators() //Continously listen if new elevator entring networks is trying to establish connection
 	//go run HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators)
 }

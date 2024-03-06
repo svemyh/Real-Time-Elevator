@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"time"
 )
@@ -19,18 +20,16 @@ type RXChannels struct {
 }
 */
 
-func InitReceiver(ctx context.Context, receiver chan<- string, addressString string) {
+func InitReceiver(ctx context.Context, receiver chan<- string, addressString string) string {
 	addr, err := net.ResolveUDPAddr("udp", addressString) //addressString to actual address(server/)
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
-		return
 	}
 
 	// TODO: recvSock = new Socket(udp). Bind address we want to use to the socket
 	recvSock, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		fmt.Println("Error listening:", err)
-		return
 	}
 	defer recvSock.Close() // Close recvSock AFTER surrounding main function completes
 
@@ -39,7 +38,7 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			break
 		default:
 			recvSock.SetReadDeadline(time.Now().Add(3 * time.Second))
 			buffer = make([]byte, 1024)
@@ -47,35 +46,40 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 			numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
 			if err != nil {
 				fmt.Println("Error readFromUDP:", err)
-				return
+				break
 			}
 			message := string(buffer[:numBytesReceived])
 
 			localIP, err := net.ResolveUDPAddr("udp", addressString) // localIP
 			if err != nil {
 				fmt.Println("Error resolving UDP address:", err)
-				return
+				break
 			}
 
 			if string(fromWho.IP) != string(localIP.IP) {
 				fmt.Printf("Received: %s\n", message)
 				//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
 				//receiver <- messageInitStateByBroadcastingNetworkAndWait()
+				return message
 			} else {
 				fmt.Println("rand message is: ", message)
 				receiver <- message
 			}
 		}
 	}
+
 }
 
-func InitNetwork(isPrimary bool) {
-	if isPrimary { // do primary things
-		PrimaryRoutine()
-		// go HandlePrimaryTasks
-		return
+func InitNetwork(ctx context.Context) {
+	isPrimary := AmIPrimary(detectionPort)
+	if isPrimary {
+		go UDPBroadCastPrimaryRole(ctx, detectionPort)
+		log.Println("Operating as primary...")
+		go PrimaryRoutine()
+	} else {
+		log.Println("Operating as client...")
+		go ClientRoutine()
 	}
-	BackupRoutine()
 }
 
 //receiverChan := make(chan string)

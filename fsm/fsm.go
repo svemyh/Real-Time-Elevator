@@ -146,9 +146,7 @@ func FsmOnDoorTimeout() {
 
 func FsmRun(device elevio.ElevInputDevice) {
 	var prev int = -1
-	log.Println("is here")
-
-	log.Println("is here")
+	log.Println("is in fsm")
 
 	if f := elevio.GetFloor(); f == -1 {
 		FsmOnInitBetweenFloors()
