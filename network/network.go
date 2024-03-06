@@ -33,7 +33,7 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 	}
 	defer recvSock.Close() // Close recvSock AFTER surrounding main function completes
 
-	buffer := make([]byte, 1024) // a buffer where the received network data is stored byte[1024] buffer
+	//buffer := make([]byte, 1024) // a buffer where the received network data is stored byte[1024] buffer
 
 	for {
 		select {
@@ -41,7 +41,7 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 			break
 		default:
 			recvSock.SetReadDeadline(time.Now().Add(3 * time.Second))
-			buffer = make([]byte, 1024)
+			buffer := make([]byte, 1024)
 
 			numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
 			if err != nil {
@@ -61,13 +61,65 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 				//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
 				//receiver <- messageInitStateByBroadcastingNetworkAndWait()
 				return message
-			} else {
-				fmt.Println("rand message is: ", message)
-				receiver <- message
-			}
+			} 
 		}
 	}
+}
 
+func Receiver(ctx context.Context, TCPPort string) {
+	ls, err := net.Listen("tcp", TCPPort)
+	if err != nil {
+		fmt.Println("The connection failed. Error:", err)
+		return
+	}
+	defer ls.Close()
+
+	fmt.Println("Connected to port:", TCPPort)
+	for {
+		conn, err := ls.Accept()
+		if err != nil {
+			fmt.Println("Error: ", err)
+			continue
+		}
+
+		go handleConnection(conn)
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	//Accept
+	fmt.Printf("Accepted connection from %s\n", conn.LocalAddr())
+
+	//Send
+	msg := fmt.Sprintf("Connect to: %s\n", conn.LocalAddr())
+	conn.Write([]byte(msg))
+}
+
+
+func Transmitter(TCPPort string) {
+	conn, err := net.Dial("tcp", TCPPort)
+	if err != nil {
+		fmt.Println("The connection failed. Error: ", err)
+		return
+	} else {
+		fmt.Printf("The connection was established to: %s \n", conn.RemoteAddr()) //wtf
+	}
+
+	conn.Write([]byte("From client!"))
+
+	buffer := make([]byte, 1024)
+	bytes, err := conn.Read(buffer)
+	if err != nil {
+		fmt.Println("Error resolving UDP address:", err)
+		return
+	}
+
+	fmt.Println(string(buffer[:bytes]))
+
+	defer conn.Close()
 }
 
 func InitNetwork(ctx context.Context) {
@@ -78,7 +130,7 @@ func InitNetwork(ctx context.Context) {
 		go PrimaryRoutine()
 	} else {
 		log.Println("Operating as client...")
-		go ClientRoutine()
+		go SecondaryRoutine()
 	}
 }
 

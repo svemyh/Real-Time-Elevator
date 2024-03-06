@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+type Primary struct {
+	Ip       string
+	lastSeen time.Time
+}
+
 /*
 func RunPrimaryBackup(necessarychannels...) {
 	if AmIPrimary() {
@@ -32,7 +37,7 @@ bool
 
 func UDPBroadCastPrimaryRole(ctx context.Context, port string) {
 	//def our local address
-	laddr, err := net.ResolveUDPAddr("udp", ":0") // localIP
+	laddr, err := net.ResolveUDPAddr("udp", ":0") // Using the zero-port
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
@@ -85,7 +90,7 @@ func AmIPrimary(addressString string) bool {
 	buffer := make([]byte, 1024)
 	_, _, err = conn.ReadFromUDP(buffer)
 	if err != nil {
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() { // assert error to net.Error as this type can be checked as a timeout error
 			log.Println("No message received, becoming primary...")
 			return true
 		}
@@ -95,8 +100,12 @@ func AmIPrimary(addressString string) bool {
 	return false
 }
 
-/*
- */
+func TCPListenForNewElevators() {
+	//listen for new elevators on TCP port
+	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
+	//go TCPReadElevatorStates(stateUpdateCh)
+}
+
 func PrimaryRoutine() { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
@@ -104,6 +113,11 @@ func PrimaryRoutine() { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElev
 	defer cancel()
 
 	go UDPBroadCastPrimaryRole(ctx, detectionPort) //Continously broadcast that you are a primary on UDP
+	//TODO: if list of active elevators > 1, try to use the transmitter or receiver
+	for {	
+		Transmitter(detectionPort)
+		time.Sleep(1 * time.Second)
+	}
 	//go run TCPListenForNewElevators() //Continously listen if new elevator entring networks is trying to establish connection
 	//go run HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators)
 }
