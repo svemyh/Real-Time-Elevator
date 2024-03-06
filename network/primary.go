@@ -3,6 +3,8 @@ package network
 import (
 	"fmt"
 	"log"
+	"net"
+	"time"
 )
 
 /*
@@ -26,6 +28,47 @@ If nothing is heard in this time ---> returns True
 Return:
 bool
 */
+
+func UDPBroadCastPrimaryRole(port string) {
+		//def our local address
+		laddr, err := net.ResolveUDPAddr("udp", ":10000") // localIP
+		if err != nil {
+			fmt.Println("Error resolving UDP address:", err)
+			return
+		}
+	
+		//def remote addr
+		raddr, err := net.ResolveUDPAddr("udp", port) //addressString to actual address(server/)
+		if err != nil {
+			fmt.Println("Error resolving UDP address:", err)
+			return
+		}
+	
+		//create a connection to raddr through a socket object
+		sockConn, err := net.DialUDP("udp", laddr, raddr)
+	
+		defer sockConn.Close()
+
+		for {
+	
+		//Create an empty buffer to to filled
+		buffer := make([]byte, 1024)
+		//oob := make([]byte, 1024)
+	
+		n := copy(buffer, []byte("Im Primary!"))
+	
+		fmt.Printf("copied %d bytes to the buffer from primary: %s\n", n, buffer[:n])
+	
+		n, err = sockConn.Write(buffer)
+	
+		if err != nil {
+			fmt.Println("Error resolving WriteMsgUDP: No one is listening")
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+	
+
 func AmIPrimary() bool {
 	if InitProcessPair() == "PRIMARY" {
 		log.Println("AmIPrimary? Yes")
@@ -41,7 +84,7 @@ func PrimaryRoutine() { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElev
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
 	fmt.Println("PrimaryRoutine")
-	go UDPBroadCastPrimaryRole(":20017") //Continously broadcast that you are a primary on UDP
+	go UDPBroadCastPrimaryRole(detectionPort) //Continously broadcast that you are a primary on UDP
 	//go run TCPListenForNewElevators() //Continously listen if new elevator entring networks is trying to establish connection
 	//go run HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators)
 }

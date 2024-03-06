@@ -3,7 +3,6 @@ package fsm
 import (
 	"elevator/elevator"
 	"elevator/elevio"
-	"elevator/network"
 	"elevator/requests"
 	"elevator/timer"
 	"fmt"
@@ -149,7 +148,6 @@ func FsmRun(device elevio.ElevInputDevice) {
 	var prev int = -1
 	log.Println("is here")
 
-	network.InitNetwork(network.AmIPrimary())
 	log.Println("is here")
 
 	if f := elevio.GetFloor(); f == -1 {

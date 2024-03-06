@@ -3,8 +3,7 @@ package main
 import (
 	"elevator/elevio"
 	"elevator/fsm"
-
-	//"elevator/network"
+	"elevator/network"
 	"fmt"
 )
 
@@ -25,6 +24,8 @@ func main() {
 	go elevio.PollButtons(device.RequestButtonCh)
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
+
+	network.InitNetwork(network.AmIPrimary())
 
 	go fsm.FsmRun(device)
 

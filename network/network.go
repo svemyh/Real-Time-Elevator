@@ -42,7 +42,7 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 		case <-ctx.Done():
 			return
 		default:
-			recvSock.SetReadDeadline(time.Now().Add(1 * time.Second))
+			recvSock.SetReadDeadline(time.Now().Add(3 * time.Second))
 			buffer = make([]byte, 1024)
 
 			numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
@@ -51,7 +51,6 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 				return
 			}
 			message := string(buffer[:numBytesReceived])
-			fmt.Println("Breakpoint: 2")
 
 			localIP, err := net.ResolveUDPAddr("udp", addressString) // localIP
 			if err != nil {
@@ -60,7 +59,7 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 			}
 
 			if string(fromWho.IP) != string(localIP.IP) {
-				fmt.Println(message)
+				fmt.Printf("Received: %s\n", message)
 				//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
 				//receiver <- messageInitStateByBroadcastingNetworkAndWait()
 			} else {
@@ -73,14 +72,14 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 
 func InitProcessPair() string {
 	var (
-		currentRole = "Slave" // Start as a slave.
+		currentRole = "SLAVE" // Start as a slave.
 	)
 
 	receiverChan := make(chan string)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go InitReceiver(ctx, receiverChan, ":20017")
+	go InitReceiver(ctx, receiverChan, detectionPort)
 
 	messageReceived := false
 	timer := time.NewTimer(3 * time.Second) // set to 3 seconds
@@ -89,7 +88,8 @@ func InitProcessPair() string {
 		case msg := <-receiverChan:
 			log.Println("Received message:", msg)
 			messageReceived = true
-			timer.Reset(3 * time.Second) // Reset the timer if a message is received.
+			//timer.Reset(3 * time.Second) // Reset the timer if a message is received.
+			return currentRole
 		case <-timer.C:
 			if !messageReceived {
 				// No message was received within the time frame.
@@ -109,14 +109,13 @@ func InitProcessPair() string {
 	return currentRole
 }
 
-func InitNetwork(primaryOrBackup bool) {
-	if primaryOrBackup == true { // do primary things
+func InitNetwork(isPrimary bool) {
+	if isPrimary { // do primary things
 		PrimaryRoutine()
 		// go HandlePrimaryTasks
 		return
 	}
 	BackupRoutine()
-	return
 }
 
 //receiverChan := make(chan string)
