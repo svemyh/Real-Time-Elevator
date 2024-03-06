@@ -56,11 +56,12 @@ func UDPBroadCastPrimaryRole(ctx context.Context, port string) {
 			return
 		default:
 			message := "I'm Primary!"
-			_, err := sockConn.Write([]byte(message))
-			fmt.Printf("Broadcasting: %s\n", message)
-			if err != nil {
-				log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
-			}
+			sockConn.Write([]byte(message))
+			//_, err := sockConn.Write([]byte(message))
+			//fmt.Printf("Broadcasting: %s\n", message)
+			//if err != nil {
+			//	log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
+			//}
 			time.Sleep(1 * time.Second)
 		}
 	}
