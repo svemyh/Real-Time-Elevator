@@ -3,6 +3,12 @@ package hall_request_assigner
 import (
 	"elevator/elevator"
 	"elevator/elevio"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net"
+	"os/exec"
+	"runtime"
 )
 
 // Struct members must be public in order to be accessible by json.Marshal/.Unmarshal
@@ -16,8 +22,8 @@ type HRAElevState struct {
 }
 
 type HRAInput struct {
-	HallRequests [][2]bool               `json:"hallRequests"`
-	States       map[string]HRAElevState `json:"states"`
+	HallRequests [elevio.N_Floors][2]bool `json:"hallRequests"`
+	States       map[string]HRAElevState  `json:"states"`
 }
 
 type ActiveElevator struct {
@@ -28,39 +34,7 @@ type ActiveElevator struct {
 // Consider an array called "ActiveElevators" of objects (or pointers to objects) of type elevio.Elevator, where each elevio.Elevator corresponds to an "active/alive" elevator, that can take requests.
 // Make a function HallRequestAssigner that takes in "ActiveElevators" and spits out a similar array of elevio.Elevator objects with newly assigned requests. This array will be fed to the fsm of the individual elevators.
 
-// Init ActiveElevators and append two instances of Elevators to it
-// func InitActiveElevators() []ActiveElevator {
-//    var ActiveElevators []ActiveElevator
-//    ActiveElevators = make([]ActiveElevator, 0)
-
-//    ActiveElevators = append(ActiveElevators, elevio.Elevator{
-//        Floor:     1,
-//        Dirn:      elevio.DirnUp,                                                                                                                     // Assuming elevio.DirnUp is a valid constant
-//        Requests:  [elevio.N_Floors][elevio.N_Buttons]bool{{false, true, false}, {true, false, false}, {false, false, false}, {false, false, false}}, // Example, adjust based on actual N_Floors and N_Buttons
-//        Behaviour: elevio.EB_Idle,                                                                                                                    // Replace someBehaviourValue with actual value
-//        Config: Config{
-//            ClearRequestVariant: CV_All,
-//            DoorOpenDurationS:   3.0,
-//        },
-//        MyAddress: "abc.def.ghi.jkl",
-//    })
-
-//    ActiveElevators = append(ActiveElevators, elevio.Elevator{
-//        Floor:     1,
-//        Dirn:      elevio.DirnUp,                                                                                                                  // Assuming elevio.DirnUp is a valid constant
-//        Requests:  [elevio.N_Floors][elevio.N_Buttons]bool{{true, true, false}, {true, true, false}, {true, false, false}, {false, false, false}}, // Example, adjust based on actual N_Floors and N_Buttons
-//        Behaviour: elevio.EB_Idle,                                                                                                                 // Replace someBehaviourValue with actual value
-//        Config: Config{
-//            ClearRequestVariant: CV_All,
-//            DoorOpenDurationS:   3.0,
-//        },
-//        MyAddress: "abc.def.ghi.jkl",
-//    })
-
-//    return ActiveElevators
-// }
-
-func ActiveElevators_to_CombinedHallRequests(ActiveElevators []ActiveElevator) [][2]bool {
+func ActiveElevators_to_CombinedHallRequests(ActiveElevators []ActiveElevator) [elevio.N_Floors][2]bool {
 	var CombinedHallRequests [elevio.N_Floors][2]bool
 
 	for i := 0; i < len(ActiveElevators); i++ {
@@ -73,9 +47,10 @@ func ActiveElevators_to_CombinedHallRequests(ActiveElevators []ActiveElevator) [
 }
 
 func ActiveElevators_to_HRAInput(ActiveElevators []ActiveElevator) HRAInput {
-	var StateMap map[string]hall_request_assigner.HRAElevState
-	for i := 0; i < len(ActiveElevators); i++ {
-		StateMap[ActiveElevators[i].MyAddress] = ActiveElevatorsToHRAElevatorState(ActiveElevators[i])
+	StateMap := make(map[string]HRAElevState)
+	for _, activeElevator := range ActiveElevators {
+		//StateMap[ActiveElevators[i].MyAddress] = ActiveElevatorsToHRAElevatorState(ActiveElevators[i])
+		StateMap[activeElevator.MyAddress] = ActiveElevatorsToHRAElevatorState(activeElevator)
 	}
 
 	input := HRAInput{
@@ -126,4 +101,86 @@ func ActiveElevatorsToHRAElevatorState(ActiveElevator ActiveElevator) HRAElevSta
 	ElevatorState.Direction = DirnToString(int(ActiveElevator.Elevator.Dirn))
 	ElevatorState.CabRequests = RequestsToCab(ActiveElevator.Elevator.Requests)
 	return ElevatorState
+}
+
+func InitActiveElevator() ActiveElevator {
+	return ActiveElevator{
+		Elevator: elevator.Elevator{
+			Floor:     1,
+			Dirn:      elevio.D_Stop,
+			Behaviour: elevator.EB_Idle,
+			Config: elevator.Config{
+				ClearRequestVariant: elevator.CV_All,
+				DoorOpenDurationS:   3.0,
+			},
+		},
+		MyAddress: GetLocalIPv4(),
+	}
+}
+
+func GetLocalIPv4() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
+}
+
+func HallRequestAssigner(ActiveElevators []ActiveElevator) []ActiveElevator {
+
+	hraExecutable := ""
+	switch runtime.GOOS {
+	case "linux":
+		hraExecutable = "hall_request_assigner"
+	case "windows":
+		hraExecutable = "hall_request_assigner.exe"
+	default:
+		panic("OS not supported")
+	}
+
+	input := ActiveElevators_to_HRAInput(ActiveElevators)
+
+	jsonBytes, err := json.Marshal(input)
+	if err != nil {
+		fmt.Println("json.Marshal error: ", err)
+		//return "Error parsing input to json"
+	}
+
+	ret, err := exec.Command("hall_request_assigner/"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
+	if err != nil {
+		fmt.Println("exec.Command error: ", err)
+		fmt.Println(string(ret))
+		//return "Error executing hall_request_assigner"
+	}
+
+	output := new(map[string][][2]bool)
+	err = json.Unmarshal(ret, &output)
+	if err != nil {
+		fmt.Println("json.Unmarshal error: ", err)
+		//return "Error parsing output from json"
+	}
+
+	outputString := "output: \n"
+	for k, v := range *output {
+		//fmt.Printf("%6v :  %+v\n", k, v)
+		outputString += fmt.Sprintf("%6v :  %+v\n", k, v)
+	}
+
+	return outputToNewActiveElevators(*output, ActiveElevators)
+}
+
+func outputToNewActiveElevators(output map[string][][2]bool, ActiveElevators []ActiveElevator) []ActiveElevator {
+	for i, activeElevator := range ActiveElevators {
+		hallRequests := output[activeElevator.MyAddress]
+		for floor := 0; floor < elevio.N_Floors; floor++ {
+			ActiveElevators[i].Elevator.Requests[floor][0] = hallRequests[floor][0]
+			ActiveElevators[i].Elevator.Requests[floor][1] = hallRequests[floor][1]
+			// ActiveElevators[i].Elevator.Requests[floor][3] = 0 // Question: Should we clear the cab requests here? - Answer depends on how hall_request_assigner.exe is coded. TODO: Check functionality by enabling/disabling this at later time when functioning elevators are acheived.
+		}
+	}
+	return ActiveElevators
 }

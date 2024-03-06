@@ -1,44 +1,20 @@
 package main
 
 import (
-	"elevator/elevator"
-	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"fmt"
 )
 
 func main() {
-	elev1 := elevator.Elevator{
-		Floor:     1,
-		Dirn:      elevio.D_Down,                                                                                                                  // Assuming elevio.DirnUp is a valid constant
-		Requests:  [elevio.N_Floors][elevio.N_Buttons]bool{{true, true, false}, {true, true, false}, {true, false, false}, {false, false, false}}, // Example, adjust based on actual N_Floors and N_Buttons
-		Behaviour: elevator.EB_Idle,                                                                                                               // Replace someBehaviourValue with actual value
-		Config: elevator.Config{
-			ClearRequestVariant: elevator.CV_All,
-			DoorOpenDurationS:   3.0,
-		},
-	}
+	// The following code demonstrates the hall_request_assigner functionality.
 
-	elev2 := elevator.Elevator{
-		Floor:     1,
-		Dirn:      elevio.D_Down,                                                                                                                 // Assuming elevio.DirnUp is a valid constant
-		Requests:  [elevio.N_Floors][elevio.N_Buttons]bool{{true, true, false}, {true, true, false}, {true, false, true}, {false, false, false}}, // Example, adjust based on actual N_Floors and N_Buttons
-		Behaviour: elevator.EB_Idle,                                                                                                              // Replace someBehaviourValue with actual value
-		Config: elevator.Config{
-			ClearRequestVariant: elevator.CV_All,
-			DoorOpenDurationS:   3.0,
-		},
-	}
+	activeElev := hall_request_assigner.InitActiveElevator() // Initializes a default elevator with floor 1, direction stop, and behavior idle. This is the elevator that will be used to test the hall_request_assigner functionality.
 
-	activElev1 := hall_request_assigner.ActiveElevator{Elevator: elev1, MyAddress: "555"}
-	activElev2 := hall_request_assigner.ActiveElevator{Elevator: elev2, MyAddress: "666"}
+	var ActiveElevators []hall_request_assigner.ActiveElevator // Initializes ActiveElevators.
+	ActiveElevators = append(ActiveElevators, activeElev)      // Adds an elevator to ActiveElevators.
 
-	var activeElevators []hall_request_assigner.ActiveElevator
-	activeElevators = append(activeElevators, activElev1, activElev2)
+	// The following []ActiveElevator object contains updated hall requests determined by hall_request_assigner.exe. Not certain if cab-requests should or should not be updated aswell. Question: Should we clear the cab requests here? - Answer depends on how hall_request_assigner.exe is coded. TODO: Check functionality by enabling/disabling this at later time when functioning elevators are acheived.
+	NewActiveElevators := hall_request_assigner.HallRequestAssigner(ActiveElevators) // Computes new hall requests for the elevators in ActiveElevators. Returns object of same type as ActiveElevators.
+	fmt.Println("NewActiveElevators:", NewActiveElevators)
 
-	e := hall_request_assigner.RequestsToCab(elev1.Requests)
-	println(e)
-
-	HRAStates := hall_request_assigner.ActiveElevatorsToHRAElevatorState(activElev1)
-	fmt.Printf("HRAStates: %v\n", HRAStates)
 }

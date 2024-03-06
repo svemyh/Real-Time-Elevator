@@ -3,7 +3,6 @@ package main
 import (
 	"elevator/elevio"
 	"elevator/fsm"
-
 	"fmt"
 )
 
