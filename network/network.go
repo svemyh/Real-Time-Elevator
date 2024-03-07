@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os/exec"
 	"time"
 )
 
@@ -61,7 +62,7 @@ func InitReceiver(ctx context.Context, receiver chan<- string, addressString str
 				//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
 				//receiver <- messageInitStateByBroadcastingNetworkAndWait()
 				return message
-			} 
+			}
 		}
 	}
 }
@@ -97,7 +98,6 @@ func handleConnection(conn net.Conn) {
 	msg := fmt.Sprintf("Connect to: %s\n", conn.LocalAddr())
 	conn.Write([]byte(msg))
 }
-
 
 func Transmitter(TCPPort string) {
 	conn, err := net.Dial("tcp", TCPPort)
@@ -209,3 +209,31 @@ func DistributeHallButtonLights(assignedHallReq) {
 	//TODO: all
 }
 */
+
+func ConnectedToNetwork() bool {
+	conn, err := net.Dial("udp", "8.8.8.8:53") // (8.8.8.8 is a Google DNS)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	return true
+}
+
+func RestartOnReconnect() {
+	prevWasConnected := ConnectedToNetwork()
+	for {
+		if (ConnectedToNetwork()) && (prevWasConnected == false) {
+			fmt.Println("restarting stuffs:")
+			exec.Command("gnome-terminal", "--", "go", "run", "./main.go").Run()
+			panic("No network connection. Terminating current run - restarting from restart.go")
+		}
+		if ConnectedToNetwork() {
+			prevWasConnected = true
+			fmt.Println("network yes")
+		} else {
+			prevWasConnected = false
+			fmt.Println("network no")
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
