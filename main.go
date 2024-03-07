@@ -1,17 +1,12 @@
 package main
 
 import (
+	"context"
 	"elevator/elevio"
 	"elevator/fsm"
-	"elevator/hall_request_assigner"
-	"encoding/json"
+	"elevator/network"
 	"fmt"
-	"os/exec"
-	"runtime"
-	"time"
 )
-
-const inputPollRate = 25 * time.Millisecond
 
 func main() {
 	elevio.Init("localhost:15657", elevio.N_Floors)
@@ -31,102 +26,163 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go network.InitNetwork(ctx)
+
 	go fsm.FsmRun(device)
 
-	hraExecutable := ""
-	switch runtime.GOOS {
-	case "linux":
-		hraExecutable = "hall_request_assigner"
-	case "windows":
-		hraExecutable = "hall_request_assigner.exe"
-	default:
-		panic("OS not supported")
-	}
+	go network.RestartOnReconnect()
 
-	input := hall_request_assigner.HRAInput{
-		HallRequests: [][2]bool{{false, false}, {true, false}, {false, false}, {false, true}},
-		States: map[string]hall_request_assigner.HRAElevState{
-			"one": hall_request_assigner.HRAElevState{
-				Behavior:    "moving",
-				Floor:       2,
-				Direction:   "up",
-				CabRequests: []bool{false, false, false, true},
-			},
-			"two": hall_request_assigner.HRAElevState{
-				Behavior:    "idle",
-				Floor:       0,
-				Direction:   "stop",
-				CabRequests: []bool{false, false, false, false},
-			},
-			"three": hall_request_assigner.HRAElevState{
-				Behavior:    "idle",
-				Floor:       0,
-				Direction:   "stop",
-				CabRequests: []bool{false, false, false, false},
-			},
-		},
-	}
+	//establishConnectionWithPrimary() // TCP
 
-	jsonBytes, err := json.Marshal(input)
-	if err != nil {
-		fmt.Println("json.Marshal error: ", err)
-		return
-	}
+	/*
 
-	ret, err := exec.Command("hall_request_assigner/"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
-	if err != nil {
-		fmt.Println("exec.Command error: ", err)
-		fmt.Println(string(ret))
-		return
-	}
+			hraExecutable := ""
+			switch runtime.GOOS {
+			case "linux":
+				hraExecutable = "hall_request_assigner"
+			case "windows":
+				hraExecutable = "hall_request_assigner.exe"
+			default:
+				panic("OS not supported")
+			}
 
-	output := new(map[string][][2]bool)
-	err = json.Unmarshal(ret, &output)
-	if err != nil {
-		fmt.Println("json.Unmarshal error: ", err)
-		return
-	}
+			input := hall_request_assigner.HRAInput{
+				HallRequests: [][2]bool{{false, false}, {true, false}, {false, false}, {false, true}},
+				States: map[string]hall_request_assigner.HRAElevState{
+					"one": hall_request_assigner.HRAElevState{
+						Behavior:    "moving",
+						Floor:       2,
+						Direction:   "up",
+						CabRequests: []bool{false, false, false, true},
+					},
+					"two": hall_request_assigner.HRAElevState{
+						Behavior:    "idle",yState := InitStateByBroadcastingNetworkAndWait()
+		// If myState == PRIMARY {
+		//		ActiveElevators[type array of structs Elevator] <- getAllElevatorStates()
+		// 		sendOverNetworkToSecondary(ActiveElevators)
+		//		for {
+		//			ack <- network_recieved_ack
+		//			time.sleep()
+		//		}
+		//      NewElevatorOrders = HallRequestAssigner(ActiveElevators[type array of structs Elevator])
+		//		DistributeOrdersOverNetwork(NewElevatorOrders)
+		// }
+						Floor:       0,
+						Direction:   "stop",
+						CabRequests: []bool{false, false, false, false},
+					},
+					"three": hall_request_assigner.HRAElevState{
+						Behavior:    "idle",
+						Floor:       0,
+						Direction:   "stop",
+						CabRequests: []bool{false, false, false, false},
+					}
+					// TODO: recvret))
+				//return
+				}
+			}
 
-	fmt.Printf("output: \n")
-	for k, v := range *output {
-		fmt.Printf("%6v :  %+v\n", k, v)
-	}
+			output := new(map[string][][2]bool)
+			err = json.Unmarshal(ret, &output)
+			if err != nil {
+				fmt.Println("json.Unmarshal error: ", err)
+				return
+			}
 
+			fmt.Printf("output: \n")
+			for k, v := range *output {
+				fmt.Printf("%6v :  %+v\n", k, v)
+			}
+	*/
 	select {}
+	// 	InitLocalFSM()
+	// 	if InitProcessPair() == "PRIMARY" {
+	// 			go PrimaryRoutine()
+	// 	}
+	// 	else {
+	// 		 establishConnectionWithPrimary()
 
-	// myState := InitStateByBroadcastingNetworkAndWait()
-	// If myState == PRIMARY:
-	//		ActiveElevators <- getAllElevatorStates()
-	// 		sendOverNetworkToSecondary(ActiveElevators)
-	//		for {
-	//			ack <- network_recieved_ack
-	//			time.sleep()
-	//		}
-	//      NewElevatorOrders = HallRequestAssigner(ActiveElevators)
-	//		DistributeOrdersOverNetwork(NewElevatorOrders)
-	//
-	// func DistributeOrdersOverNetwork(NewElevatorOrders):
-	//
-	// 		for i in ActiveElevators:
-	//			sendOverNetwork(ActiveElevators[i])
-	//			for {
-	//				ack <- network_reciever
-	//				time.sleep()
-	//			}
-	//
-	//		for i in ActiveElevators:
-	//			sendOverNetwork(buttonlights)
-	//			for {
-	//				ack <- network_reciever
-	//				time.sleep()
-	//			}
-	//
-	//
-	// chan networkReciever
-	// func getAllElevatorStates(chan networkReciever)
+	// 	}
 
-	// case newEvent := <- networkReciever
-	//	 (MYIP, elevio.elevator)
-	//   ActiveElevators("MYIP") = elevio.elevator
+	// 	func PrimaryRoutine(ActiveElevators) {
 
+	// 			ActiveElevators[type array of structs Elevator] <- getAllACtiveElevatorStates()
+
+	// 			Secondary = ActiveElevators[0]
+
+	// 			sendPromotionMessageToSecondary(Secondary.MyAddress)
+
+	// 			for {							// continue after acknowledgement
+	// 				ack <- network_recieved_ack
+	// 				time.sleep()
+	// 			}
+
+	// 			sendStatesOverNetworkToSecondary(ActiveElevators, Secondary.MyAddress)
+	// 			for {
+	// 				ack <- network_recieved_ack
+	// 				time.sleep()
+	// 			}
+
+	// 	     NewElevatorOrders = HallRequestAssigner(ActiveElevators[type array of structs Elevator])
+	// 			DistributeOrdersOverNetwork(NewElevatorOrders)
+	// 	}
+
+	// 	func SecondaryRoutine() {
+	// 			initialize SecondarySinActiveElevators
+	// 			go ListenToPrimary(chan messageCh, address)
+	// 			case:
+	// 				ActiveElevators<-messageCh:
+	// 			SecondarySinActiveElevators = ActiveElevators
+
+	// 	}
+
+	// 	func RegularRoutine() {
+	// 			go ListenForPromotion(msg chan<-string)
+	// 			for {
+	// 				select {
+	// 			case: promotion <- msg
+	// 				if promotion == "You are now secondary":
+	// 					cancel ListenForPromotion()
+	// 					go SecondaryRoutine()
+	// 		}
+	// 	}
+
+	// 			// Do nothing
+	// 	}
+
+	// 	TODO:
+
+	// 	func InitMyState()  {
+
+	// 	}
+
+	// 	func DistributeOrdersOverNetwork(NewElevatorOrders):
+	// 			// TODO: Make this routine function in parallell instead of in series
+
+	// 			for i in ActiveElevators:
+	// 				sendOverNetwork(NewElevatorOrders[i])
+	// 				for {
+	// 					ack <- network_reciever
+	// 					time.sleep()
+	// 				}
+
+	// 			for i in ActiveElevators:
+	// 				sendOverNetwork(buttonlights)
+	// 				for {
+	// 					ack <- network_reciever
+	// 					time.sleep()
+	// 				}
+	// 	}
+
+	// 	chan networkReciever
+	// 	func getAllElevatorStates(chan networkReciever)
+
+	// 	case newEvent := <- networkReciever
+	// 		 (MyAdress, elevio.elevator)
+	// 	  ActiveElevators("MYIP") = elevio.elevator
+
+	// }
 }
