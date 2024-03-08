@@ -105,7 +105,7 @@ func AmIPrimary(addressString string) (bool, string) {
 	return false, primaryAddr.String()
 }
 
-func TCPListenForNewElevators(TCPPort string) {
+func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent) {
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
 	//go TCPReadElevatorStates(stateUpdateCh)
@@ -124,24 +124,23 @@ func TCPListenForNewElevators(TCPPort string) {
 			continue
 		}
 
-		StateUpdateCh := make(chan hall_request_assigner.ActiveElevator) // Should these channels be initialized here or somewhere else? -Sveinung
-		HallOrderCompleteCh := make(chan elevio.ButtonEvent)
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh)
 		time.Sleep(1 * time.Second)
 	}
 
 }
 
-func PrimaryRoutine() { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
+func PrimaryRoutine(StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go UDPBroadCastPrimaryRole(ctx, DETECTION_PORT) //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT)    //Continously listen if new elevator entring networks is trying to establish connection
-	//go HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators)
+	go UDPBroadCastPrimaryRole(ctx, DETECTION_PORT)                                  //Continously broadcast that you are a primary on UDP
+	go TCPListenForNewElevators(TCP_LISTEN_PORT, StateUpdateCh, HallOrderCompleteCh) //Continously listen if new elevator entring networks is trying to establish connection
+	InitActiveElevators := make([]hall_request_assigner.ActiveElevator, 0)
+	go HandlePrimaryTasks(StateUpdateCh, HallOrderCompleteCh, InitActiveElevators)
 }
 
 // get new states everytime a local elevator updates their states.
@@ -149,41 +148,48 @@ func PrimaryRoutine() { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElev
 // we start by initializing a backup if possible
 // then if we have other elevators on network then assign hall req for each elevator(by cost) distribute them and button lights
 // if there are other elevators on network then send states to the backup
-/*
+
 func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, ActiveElevators []hall_request_assigner.ActiveElevator) {
-	var backup Elevator
+	//var backup elevator.Elevator
 	//var ActiveElevators []ActiveElevator init here or take in as param to func, allows Backup.BecomePrimary to send in prev states
 	//can send in as empty array first time primary takes over
 	for {
+
 		select {
 		case stateUpdate := <-StateUpdateCh: //updates if new state is sendt on one of TCP conns, blocks if not
 			//TODO: compare the state update from single elevator to active elevator array and update activeElevators
 			//TODO: update some sort of global HALLREQ array with the new hall requests
 
+			fmt.Println("StateUpdate: ", stateUpdate)
+
 			//init a backup
-			if backup == nil {
-				if len(ActiveElevators) > 1 {
-					//init a backup
-				}
-			}
+			//if backup == nil {
+			//	if len(ActiveElevators) > 1 {
+			//		//init a backup
+			//	}
+			//}
 
 			if len(ActiveElevators) > 1 {
 				//TODO: assign  new backup if needed based based on state update.
 				//TODO: send updated states to backup (with ack) (if there still is a backup)
 				//TODO: assign new new hall orders for each elevator through cost-func
-				DistributeHallRequests(assignedHallReq)     //Distribute new hall requests to each elevator, needs ack and blocking until done
-				DistributeHallButtonLights(assignedHallReq) //Distribute the button lights to each now that we have ack from each
+
+				//DistributeHallRequests(assignedHallReq)     //Distribute new hall requests to each elevator, needs ack and blocking until done
+				//DistributeHallButtonLights(assignedHallReq) //Distribute the button lights to each now that we have ack from each
 			} else {
 				//TODO: assign new new hall orders for each elevator through cost-func. we are now a primary alone on network
 				//TODO: Should have some check to see if are a primary that lost network (so a new primary has been made) or if we have network connection and no other elevators on net
-				backup = nil
-				DistributeHallRequests()     //Distribute new hall requests to each elevator, needs ack and blocking until done
-				DistributeHallButtonLights() //Distribute the button lights to each now that we have ack from each
+
+				//backup = nil
+				//DistributeHallRequests()     //Distribute new hall requests to each elevator, needs ack and blocking until done
+				//DistributeHallButtonLights() //Distribute the button lights to each now that we have ack from each
 			}
 		case CompletedOrder := <-HallOrderCompleteCh:
 			//TODO: clear order from some sort of global HALLREQ array
-			fmt.Println("Order completed at floor:", CompletedOrder)
+			fmt.Println("\n---- Order completed at floor:", CompletedOrder)
 		}
 	}
 }
-*/
+
+/*
+ */

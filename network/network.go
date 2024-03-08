@@ -146,22 +146,72 @@ func Transmitter(TCPPort string) {
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(ctx context.Context) {
+func InitNetwork(ctx context.Context, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent) {
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT)
 	if isPrimary {
 		log.Println("Operating as primary...")
-		go PrimaryRoutine()
-		//sleep for 3 sec
-		TCPDialPrimary(primaryAddress)
+		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh)
+		time.Sleep(1500 * time.Millisecond)
+		TCPDialPrimary("localhost"+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh)
 	} else {
 		log.Println("Operating as client...")
-		//TCPDialPrimary(PrimaryAddress)
+		TCPDialPrimary(primaryAddress, FSMStateUpdateCh, FSMHallOrderCompleteCh)
 		go SecondaryRoutine()
 	}
 }
 
-func TCPDialPrimary(PrimaryAddress string) {
+func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	fmt.Println("Connecting by TCP to the address: ", PrimaryAddress)
+
+	conn, err := net.Dial("tcp", PrimaryAddress)
+	if err != nil {
+		fmt.Println("Connection failed. Error: ", err)
+		return
+	}
+
+	fmt.Println("Conection established to: ", conn.RemoteAddr())
+	defer conn.Close()
+
+	for {
+		select {
+		case stateUpdate := <-FSMStateUpdateCh:
+
+			my_ActiveElevatorMsg := MsgActiveElevator{
+				Type:    TypeActiveElevator,
+				Content: stateUpdate,
+			}
+
+			data, err := json.Marshal(my_ActiveElevatorMsg)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			_, err = conn.Write(data)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+		case hallOrderComplete := <-FSMHallOrderCompleteCh:
+
+			my_ButtonEventMsg := MsgButtonEvent{
+				Type:    TypeButtonEvent,
+				Content: hallOrderComplete,
+			}
+
+			data, err := json.Marshal(my_ButtonEventMsg)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fmt.Println("Writing a ButtonEvent to the Primary:", hallOrderComplete)
+			_, err = conn.Write(data)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+		}
+	}
+
 }
 
 //receiverChan := make(chan string)
@@ -180,41 +230,44 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 
 	defer conn.Close()
 
-	// Create buffer and read data into the buffer using conn.Read()
-	var buf [1024]byte
-	n, err := conn.Read(buf[:])
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Decoding said data into a json-style object
-	var genericMsg map[string]interface{}
-	if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
-		log.Fatal(err)
-	}
-
-	// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
-	switch MessageType(genericMsg["type"].(string)) {
-	case TypeActiveElevator:
-		var msg MsgActiveElevator
-		if err := json.Unmarshal(buf[:n], &msg); err != nil {
+	for {
+		fmt.Printf("STILL IN READING LOOP PRIMARY SIDE")
+		// Create buffer and read data into the buffer using conn.Read()
+		var buf [1024]byte
+		n, err := conn.Read(buf[:])
+		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Received ActiveElevator object: %+v\n", msg)
-		StateUpdateCh <- msg.Content
 
-	case TypeButtonEvent:
-		var msg MsgButtonEvent
-		if err := json.Unmarshal(buf[:n], &msg); err != nil {
+		// Decoding said data into a json-style object
+		var genericMsg map[string]interface{}
+		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
+			fmt.Println("Error unmarshaling generic message: ", err)
 			log.Fatal(err)
 		}
-		fmt.Printf("Received ButtonEvent object: %+v\n", msg)
-		HallOrderCompleteCh <- msg.Content
 
-	default:
-		fmt.Println("Unknown message type")
+		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
+		switch MessageType(genericMsg["type"].(string)) {
+		case TypeActiveElevator:
+			var msg MsgActiveElevator
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Received ActiveElevator object: %+v\n", msg)
+			StateUpdateCh <- msg.Content
+
+		case TypeButtonEvent:
+			var msg MsgButtonEvent
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
+			HallOrderCompleteCh <- msg.Content
+
+		default:
+			fmt.Println("Unknown message type")
+		}
 	}
-
 }
 
 // Can be used for testing purposes for writing either a ActiveElevator or ButtonEvent to TCPReadElevatorStates

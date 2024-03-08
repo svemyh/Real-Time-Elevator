@@ -43,8 +43,6 @@ func main() {
 	fmt.Println("ActiveElevator has jsut been sendt to primary. Sleeping 3 sec..")
 	time.Sleep(3 * time.Second)
 
-
-	
 	fmt.Println("Sending an ButtonEvent to primary now..")
 	network.StartClient(network.TCP_LISTEN_PORT, my_ButtonEventMsg)
 	fmt.Println("ButtonEvent has jsut been sendt to primary. Sleeping 3 sec..")

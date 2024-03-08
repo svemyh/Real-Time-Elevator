@@ -4,6 +4,7 @@ import (
 	"context"
 	"elevator/elevio"
 	"elevator/fsm"
+	"elevator/hall_request_assigner"
 	"elevator/network"
 	"fmt"
 )
@@ -19,6 +20,12 @@ func main() {
 		StopButtonCh:    make(chan bool),
 		ObstructionCh:   make(chan bool),
 	}
+
+	FSMStateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
+	FSMHallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
+	StateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
+	HallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
+
 	//fsm_terminate := make(chan, bool)
 
 	go elevio.PollFloorSensor(device.FloorSensorCh)
@@ -29,9 +36,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go network.InitNetwork(ctx) // Alias: RunPrimaryBackup()
+	go network.InitNetwork(ctx, FSMStateUpdateCh, FSMHallOrderCompleteCh, StateUpdateCh, HallOrderCompleteCh) // Alias: RunPrimaryBackup()
 
-	go fsm.FsmRun(device)
+	go fsm.FsmRun(device, FSMStateUpdateCh, FSMHallOrderCompleteCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
 	go network.RestartOnReconnect()
 

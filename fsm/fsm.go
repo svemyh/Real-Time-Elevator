@@ -3,6 +3,7 @@ package fsm
 import (
 	"elevator/elevator"
 	"elevator/elevio"
+	"elevator/hall_request_assigner"
 	"elevator/requests"
 	"elevator/timer"
 	"fmt"
@@ -46,12 +47,12 @@ func FsmOnInitBetweenFloors() {
 }
 
 func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
-	fmt.Printf("\n\n%s(%d, %s)\n", "FsmOnRequestButtonPress", btnFloor, elevio.ButtonToString(btnType))
+	//fmt.Printf("\n\n%s(%d, %s)\n", "FsmOnRequestButtonPress", btnFloor, elevio.ButtonToString(btnType))
 	//elevatorPrint(elevator)
 
 	switch elevatorState.Behaviour {
 	case elevator.EB_DoorOpen:
-		println("Door Open")
+		//println("Door Open")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
 			timer.TimerStart(5)
 		} else {
@@ -59,27 +60,27 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 		}
 
 	case elevator.EB_Moving:
-		println("Moving")
+		//println("Moving")
 		elevatorState.Requests[btnFloor][btnType] = true
 
 	case elevator.EB_Idle:
-		println("Idle")
+		//println("Idle")
 		elevatorState.Requests[btnFloor][btnType] = true
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
-			fmt.Println("EB_DoorOpen")
+			//fmt.Println("EB_DoorOpen")
 			outputDevice.DoorLight = true
 			timer.TimerStart(5)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 
 		case elevator.EB_Moving:
 			elevio.SetMotorDirection(elevatorState.Dirn)
-			fmt.Println("Elevator state moving dirn", elevatorState.Dirn)
+			//fmt.Println("Elevator state moving dirn", elevatorState.Dirn)
 
 		case elevator.EB_Idle:
-			fmt.Println("EB_Idle")
+			//fmt.Println("EB_Idle")
 
 		}
 
@@ -87,11 +88,11 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 
 	SetAllLights()
 
-	fmt.Println("\nNew state:")
+	//fmt.Println("\nNew state:")
 }
 
 func FsmOnFloorArrival(newFloor int) {
-	fmt.Printf("\nArrived at floor %d\n", newFloor)
+	//fmt.Printf("\nArrived at floor %d\n", newFloor)
 	elevatorState.Floor = newFloor
 	elevio.SetFloorIndicator(elevatorState.Floor)
 
@@ -110,7 +111,7 @@ func FsmOnFloorArrival(newFloor int) {
 		break
 	}
 
-	fmt.Printf("\nNew state:\n")
+	//fmt.Printf("\nNew state:\n")
 
 }
 
@@ -122,17 +123,17 @@ func FsmOnDoorTimeout() {
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
-			fmt.Println("EB Door Open")
+			//fmt.Println("EB Door Open")
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
 			SetAllLights()
 		case elevator.EB_Moving:
-			fmt.Println("EB moving")
+			//fmt.Println("EB moving")
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(elevatorState.Dirn)
 
 		case elevator.EB_Idle:
-			fmt.Println("EB idle")
+			//fmt.Println("EB idle")
 			elevio.SetDoorOpenLamp(false)
 			elevio.SetMotorDirection(elevio.D_Stop)
 		}
@@ -140,11 +141,11 @@ func FsmOnDoorTimeout() {
 	default:
 		break
 	}
-	fmt.Printf("-------------------------------")
-	fmt.Printf("\nNew state:\n")
+	//fmt.Printf("-------------------------------")
+	//fmt.Printf("\nNew state:\n")
 }
 
-func FsmRun(device elevio.ElevInputDevice) {
+func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 
 	//elevatorState = elevator.ElevatorInit()
 
@@ -160,7 +161,7 @@ func FsmRun(device elevio.ElevInputDevice) {
 
 		select {
 		case floor := <-device.FloorSensorCh:
-			fmt.Println("Floor Sensor:", floor)
+			//fmt.Println("Floor Sensor:", floor)
 			if floor != -1 && floor != prev {
 				FsmOnFloorArrival(floor)
 				//sendToMaster
@@ -168,7 +169,8 @@ func FsmRun(device elevio.ElevInputDevice) {
 			prev = floor
 
 		case buttonEvent := <-device.RequestButtonCh:
-			fmt.Println("Button Pressed:", buttonEvent)
+			//fmt.Println("Button Pressed:", buttonEvent)
+			FSMHallOrderCompleteCh <- buttonEvent
 			FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button)) // is called when an order is recieved from primary
 
 		case obstructionSignal := <-device.ObstructionCh:
