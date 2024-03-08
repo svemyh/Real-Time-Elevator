@@ -38,6 +38,36 @@ func Receiver(ctx context.Context, receiver chan<- string, addressString string)
 	}()
 
 	for {
+		select {
+		case <-ctx.Done():
+			break
+		default:
+			recvSock.SetReadDeadline(time.Now().Add(3 * time.Second))
+			buffer := make([]byte, 1024)
+
+			numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
+			if err != nil {
+				fmt.Println("Error readFromUDP:", err)
+				break
+			}
+			message := string(buffer[:numBytesReceived])
+
+			localIP, err := net.ResolveUDPAddr("udp", addressString) // localIP
+			if err != nil {
+				fmt.Println("Error resolving UDP address:", err)
+				break
+			}
+
+			if string(fromWho.IP) != string(localIP.IP) {
+				fmt.Printf("Received: %s\n", message)
+				//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
+				//receiver <- messageInitStateByBroadcastingNetworkAndWait()
+				return message
+			}
+		}
+	}
+}
+
 
 		buffer = make([]byte, 1024)
 		fmt.Println("Breakpoint: 3")
@@ -67,8 +97,10 @@ func Receiver(ctx context.Context, receiver chan<- string, addressString string)
 	}
 }
 
-func Sender(port string) {
-	laddr, err := net.ResolveUDPAddr("udp", "localhost:20015") // localIP
+
+func Transmitter(TCPPort string) {
+	conn, err := net.Dial("tcp", TCPPort)
+
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
@@ -165,3 +197,53 @@ func RestartOnReconnect() {
 		time.Sleep(1 * time.Second)
 	}
 }
+
+*/
+
+/*
+distribute all hall requests
+needs to receive ack from each elevator sendt to.
+probably need to give it the TCP conn array
+
+func DistributeHallRequests(assignedHallReq) {
+	//TODO: all
+}
+
+
+distribute all button lights assosiated with each hallreq at each local elevator
+needs to receive ack from each elevator sendt to.
+probably need to give it the TCP conn array.
+will need ack here aswell as hall req button lights need to be syncronized across computers
+func DistributeHallButtonLights(assignedHallReq) {
+	//TODO: all
+}
+*/
+
+func ConnectedToNetwork() bool {
+	conn, err := net.Dial("udp", "8.8.8.8:53") // (8.8.8.8 is a Google DNS)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	return true
+}
+
+func RestartOnReconnect() {
+	prevWasConnected := ConnectedToNetwork()
+	for {
+		if (ConnectedToNetwork()) && (prevWasConnected == false) {
+			fmt.Println("restarting stuffs:")
+			exec.Command("gnome-terminal", "--", "go", "run", "./main.go").Run()
+			panic("No network connection. Terminating current run - restarting from restart.go")
+		}
+		if ConnectedToNetwork() {
+			prevWasConnected = true
+			fmt.Println("network yes")
+		} else {
+			prevWasConnected = false
+			fmt.Println("network no")
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
