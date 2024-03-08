@@ -86,6 +86,9 @@ func HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators) {
 			}
 		case CompletedOrder := <- OrderCompleteCh:
 			//TODO: clear order from some sort of global HALLREQ array
+
+		case HallRequests := <- RegisterHallReqCh:
+			
 		}
 	}
 }
