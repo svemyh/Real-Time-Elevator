@@ -17,7 +17,7 @@ func SecondaryRoutine() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	//TODO: select to either receive or sent at any time
-	Receiver(ctx, detectionPort)
+	Receiver(ctx, DETECTION_PORT)
 }
 
 /*

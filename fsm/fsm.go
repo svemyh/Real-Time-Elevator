@@ -145,6 +145,9 @@ func FsmOnDoorTimeout() {
 }
 
 func FsmRun(device elevio.ElevInputDevice) {
+
+	//elevatorState = elevator.ElevatorInit()
+
 	var prev int = -1
 	log.Println("is in fsm")
 
@@ -166,7 +169,7 @@ func FsmRun(device elevio.ElevInputDevice) {
 
 		case buttonEvent := <-device.RequestButtonCh:
 			fmt.Println("Button Pressed:", buttonEvent)
-			FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button))
+			FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button)) // is called when an order is recieved from primary
 
 		case obstructionSignal := <-device.ObstructionCh:
 			fmt.Println("Obstruction Detected", obstructionSignal)

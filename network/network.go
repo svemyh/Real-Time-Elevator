@@ -2,6 +2,9 @@ package network
 
 import (
 	"context"
+	"elevator/elevio"
+	"elevator/hall_request_assigner"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -9,7 +12,27 @@ import (
 	"time"
 )
 
-var detectionPort string = ":20017"
+var DETECTION_PORT string = ":20017"
+var TCP_LISTEN_PORT string = ":10001"
+
+type MessageType string
+
+const (
+	TypeActiveElevator MessageType = "ActiveElevator"
+	TypeButtonEvent    MessageType = "ButtonEvent"
+)
+
+type Message interface{}
+
+type MsgActiveElevator struct {
+	Type    MessageType                          `json:"type"`
+	Content hall_request_assigner.ActiveElevator "json:content"
+}
+
+type MsgButtonEvent struct {
+	Type    MessageType        `json:"type"`
+	Content elevio.ButtonEvent "json:content"
+}
 
 /*
 type RXChannels struct {
@@ -122,30 +145,98 @@ func Transmitter(TCPPort string) {
 	defer conn.Close()
 }
 
+// Alias: RunPrimaryBackup()
 func InitNetwork(ctx context.Context) {
-	isPrimary := AmIPrimary(detectionPort)
+	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT)
 	if isPrimary {
-		go UDPBroadCastPrimaryRole(ctx, detectionPort)
 		log.Println("Operating as primary...")
 		go PrimaryRoutine()
+		//sleep for 3 sec
+		TCPDialPrimary(primaryAddress)
 	} else {
 		log.Println("Operating as client...")
+		//TCPDialPrimary(PrimaryAddress)
 		go SecondaryRoutine()
 	}
+}
+
+func TCPDialPrimary(PrimaryAddress string) {
+	fmt.Println("Connecting by TCP to the address: ", PrimaryAddress)
 }
 
 //receiverChan := make(chan string)
 //go network.Reciever(receiverChan, "localhost:20013")
 
-/*
-
-
-func TCPReadElevatorStates(conn, StateUpdateCh, OrderCompleteCh) {
+// Alias: Server()
+func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent) {
 	//TODO:Read the states and store in a buffer
 	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
+	// Can be added/expanded: LocalErrorDetectedCh or similar
+	// type StateUpdateCh = IP + elevatorStates
+	// type HallOrderCopleteCh = floor number (of cab call completed)
+
+	fmt.Printf("*New connection accepted from adress: %s\n", conn.LocalAddr())
+
+	defer conn.Close()
+
+	// Create buffer and read data into the buffer using conn.Read()
+	var buf [1024]byte
+	n, err := conn.Read(buf[:])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Decoding said data into a json-style object
+	var genericMsg map[string]interface{}
+	if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
+		log.Fatal(err)
+	}
+
+	// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
+	switch MessageType(genericMsg["type"].(string)) {
+	case TypeActiveElevator:
+		var msg MsgActiveElevator
+		if err := json.Unmarshal(buf[:n], &msg); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Received ActiveElevator object: %+v\n", msg)
+		StateUpdateCh <- msg.Content
+
+	case TypeButtonEvent:
+		var msg MsgButtonEvent
+		if err := json.Unmarshal(buf[:n], &msg); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Received ButtonEvent object: %+v\n", msg)
+		HallOrderCompleteCh <- msg.Content
+
+	default:
+		fmt.Println("Unknown message type")
+	}
+
 }
 
+// Can be used for testing purposes for writing either a ActiveElevator or ButtonEvent to TCPReadElevatorStates
+func StartClient(port string, msg Message) {
+	conn, err := net.Dial("tcp", "localhost"+port)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = conn.Write(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+/*
 func TCPListenForNewPrimary() {
 	//listen for new primary on tcp port and accept
 }
@@ -229,11 +320,21 @@ func RestartOnReconnect() {
 		}
 		if ConnectedToNetwork() {
 			prevWasConnected = true
-			fmt.Println("network yes")
 		} else {
 			prevWasConnected = false
-			fmt.Println("network no")
 		}
 		time.Sleep(1 * time.Second)
 	}
+}
+
+func GetLocalIPv4() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
 }

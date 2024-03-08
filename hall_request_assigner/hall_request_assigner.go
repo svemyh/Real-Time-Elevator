@@ -5,10 +5,10 @@ import (
 	"elevator/elevio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os/exec"
 	"runtime"
+	"strings"
 )
 
 // Struct members must be public in order to be accessible by json.Marshal/.Unmarshal
@@ -104,6 +104,7 @@ func ActiveElevatorsToHRAElevatorState(ActiveElevator ActiveElevator) HRAElevSta
 }
 
 func InitActiveElevator() ActiveElevator {
+	ip, _ := LocalIP()
 	return ActiveElevator{
 		Elevator: elevator.Elevator{
 			Floor:     1,
@@ -114,20 +115,8 @@ func InitActiveElevator() ActiveElevator {
 				DoorOpenDurationS:   3.0,
 			},
 		},
-		MyAddress: GetLocalIPv4(),
+		MyAddress: ip,
 	}
-}
-
-func GetLocalIPv4() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP.String()
 }
 
 func HallRequestAssigner(ActiveElevators []ActiveElevator) []ActiveElevator {
@@ -183,4 +172,18 @@ func outputToNewActiveElevators(output map[string][][2]bool, ActiveElevators []A
 		}
 	}
 	return ActiveElevators
+}
+
+func LocalIP() (string, error) {
+	var localIP string
+
+	if localIP == "" {
+		conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{IP: []byte{8, 8, 8, 8}, Port: 53})
+		if err != nil {
+			return "", err
+		}
+		defer conn.Close()
+		localIP = strings.Split(conn.LocalAddr().String(), ":")[0]
+	}
+	return localIP, nil
 }
