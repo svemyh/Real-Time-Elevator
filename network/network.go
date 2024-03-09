@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var DETECTION_PORT string = ":20017"
+var DETECTION_PORT string = ":10002"
 var TCP_LISTEN_PORT string = ":10001"
 var TCP_BACKUP_PORT string = ":15000"
 

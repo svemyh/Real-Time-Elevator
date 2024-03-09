@@ -41,7 +41,7 @@ bool
 
 func UDPBroadCastPrimaryRole(ctx context.Context, port string) {
 	//def our local address
-	laddr, err := net.ResolveUDPAddr("udp", ":0") // Using the zero-port
+	laddr, err := net.ResolveUDPAddr("udp", DETECTION_PORT) // Using the zero-port
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
