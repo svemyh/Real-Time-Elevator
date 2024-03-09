@@ -54,6 +54,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCo
 	switch elevatorState.Behaviour {
 	case elevator.EB_DoorOpen:
 		//println("Door Open")
+		fmt.Println("BREAKPOINT 1")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
 			timer.TimerStart(5)
 		} else {
@@ -62,10 +63,12 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCo
 
 	case elevator.EB_Moving:
 		//println("Moving")
+		fmt.Println("BREAKPOINT 2")
 		elevatorState.Requests[btnFloor][btnType] = true
 
 	case elevator.EB_Idle:
 		//println("Idle")
+		fmt.Println("BREAKPOINT 3")
 		elevatorState.Requests[btnFloor][btnType] = true
 
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
@@ -73,6 +76,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCo
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
 			//fmt.Println("EB_DoorOpen")
+			fmt.Println("BREAKPOINT 4")
 			outputDevice.DoorLight = true
 			timer.TimerStart(5)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh)
@@ -180,6 +184,7 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 			FSMStateUpdateCh <- toBeSentActiveElevatorState // Remember to maybe implement: If the primary-local-fsm-loop takes too long time - each new ButtonEvent from localfsm needs to be ORed at the primary side instead of the Primary simply reading latest command. Danger for overwriting.
 
 			if buttonEvent.Button == elevio.ButtonType(elevio.B_Cab) {
+				fmt.Println("I will on this hill")
 				FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button), FSMHallOrderCompleteCh)
 			}
 

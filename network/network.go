@@ -235,27 +235,28 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 	for {
 		select {
 		case stateUpdate := <-FSMStateUpdateCh:
+			/*
+				my_ActiveElevatorMsg := MsgActiveElevator{
+					Type:    TypeActiveElevator,
+					Content: stateUpdate,
+				}
 
-			my_ActiveElevatorMsg := MsgActiveElevator{
-				Type:    TypeActiveElevator,
-				Content: stateUpdate,
-			}
+				data, err := json.Marshal(my_ActiveElevatorMsg)
+				if err != nil {
+					fmt.Println("Error sending to Primary: ", err)
+					return
+				}
 
-			data, err := json.Marshal(my_ActiveElevatorMsg)
-			if err != nil {
-				fmt.Println("Error sending to Primary: ", err)
-				return
-			}
-
-			fmt.Println("Writing a ActiveElevator to the Primary:", stateUpdate)
-			_, err = conn.Write(data)
-			if err != nil {
-				fmt.Println("Error sending to Primary: ", err)
-				return
-			}
+				_, err = conn.Write(data)
+				if err != nil {
+					fmt.Println("Error sending to Primary: ", err)
+					return
+				}
+				time.Sleep(50 * time.Millisecond)
+			*/
+			TCPSendActiveElevator(conn, stateUpdate)
 
 		case hallOrderComplete := <-FSMHallOrderCompleteCh:
-
 			my_ButtonEventMsg := MsgButtonEvent{
 				Type:    TypeButtonEvent,
 				Content: hallOrderComplete,
@@ -273,7 +274,7 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 				fmt.Println("Error sending to Primary: ", err)
 				return
 			}
-
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 }
@@ -308,10 +309,11 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		// Decoding said data into a json-style object
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
+			fmt.Println("genericMsg: ", genericMsg)
 			fmt.Println("Error unmarshaling generic message: ", err)
 			log.Fatal(err)
 		}
-
+		fmt.Println("genericMsg NORMAL: ", genericMsg)
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
 		switch MessageType(genericMsg["type"].(string)) {
 		case TypeActiveElevator:

@@ -5,6 +5,7 @@ import (
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -179,7 +180,8 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 	//var ActiveElevators []ActiveElevator // init here or take in as param to func, allows Backup.BecomePrimary to send in prev states
 	//can send in as empty array first time primary takes over
 	var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
-	var ActiveElevatorMap map[string]elevator.Elevator
+
+	ActiveElevatorMap := make(map[string]elevator.Elevator)
 
 	for {
 		select {
@@ -191,17 +193,27 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 			// 0) If stateUpdate.MyAddress not in ActiveElevators -> stateUpdate ActiveElevators.Append()
 			// 1) Overwrite the rest of the states (including cab requests) / 0 & 1 effectively same
 			ActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
+			//case len(ActiveElevatorMap) == 1:
 
 			// 2) OR new button-presses in new ActiveElevators to CombinedHallRequests // TODO:
 			// hall_request_assigner.ActiveElevators_to_CombinedHallRequests() or similar
 
+			// Pick one of the elevators in ActiveElevatorMap
+
 			// 3) IF not backup -> init a backup; IF backup exists -> send stateInfo to backup
-			if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
-				fmt.Println("Backup does not exists yet. Initializing it..")
-				backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
+			if len(ActiveElevatorMap) >= 2 {
+				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
+					// init a backup here:
+					fmt.Println("Backup does not exists yet. Initializing it..")
+					BackupAddr = GetBackupAddress(ActiveElevatorMap)
+					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
+				}
+				fmt.Println("Break1")
+				TCPSendActiveElevator(backupConn, stateUpdate) // Sends recieved ActiveElevator to Backup.
+				fmt.Println("Break2")
 			}
-			//sendLocalStatesToPrimaryLoop(backupConn) // something similar but not this
-			fmt.Println(backupConn.RemoteAddr().String())
+
+			// Sends 1 single ActiveElevator to backup
 
 			//---NEED NOT BECAUSE IGNORE CASE OF N ELEVATORS = 1
 			// if len(ActiveElevators) ==1 { // (Primary is alone)
@@ -217,30 +229,95 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 			// Wait for ack
 			//
 
-			if len(ActiveElevators) > 1 {
-				//TODO: assign  new backup if needed based based on state update.
-				//TODO: send updated states to backup (with ack) (if there still is a backup)
-				//TODO: assign new new hall orders for each elevator through cost-func
+			//if len(ActiveElevators) > 1 {
+			//TODO: assign  new backup if needed based based on state update.
+			//TODO: send updated states to backup (with ack) (if there still is a backup)
+			//TODO: assign new new hall orders for each elevator through cost-func
 
-				//DistributeHallRequests(assignedHallReq)     //Distribute new hall requests to each elevator, needs ack and blocking until done
-				//DistributeHallButtonLights(assignedHallReq) //Distribute the button lights to each now that we have ack from each
-			} else {
-				//TODO: assign new new hall orders for each elevator through cost-func. we are now a primary alone on network
-				//TODO: Should have some check to see if are a primary that lost network (so a new primary has been made) or if we have network connection and no other elevators on net
+			//DistributeHallRequests(assignedHallReq)     //Distribute new hall requests to each elevator, needs ack and blocking until done
+			//DistributeHallButtonLights(assignedHallReq) //Distribute the button lights to each now that we have ack from each
+			//} else {
+			//TODO: assign new new hall orders for each elevator through cost-func. we are now a primary alone on network
+			//TODO: Should have some check to see if are a primary that lost network (so a new primary has been made) or if we have network connection and no other elevators on net
 
-				//backup = nil
-				//DistributeHallRequests()     //Distribute new hall requests to each elevator, needs ack and blocking until done
-				//DistributeHallButtonLights() //Distribute the button lights to each now that we have ack from each
-			}
+			//backup = nil
+			//DistributeHallRequests()     //Distribute new hall requests to each elevator, needs ack and blocking until done
+			//DistributeHallButtonLights() //Distribute the button lights to each now that we have ack from each
+			//}
+
 		case CompletedOrder := <-HallOrderCompleteCh:
 			//TODO: clear order from some sort of global HALLREQ array
 			fmt.Println("\n---- Order completed at floor:", CompletedOrder)
 			CombinedHallRequests[CompletedOrder.Floor][CompletedOrder.Button] = false
-			// WriteStatesToBackup(CombinedHallRequests)
+
+			if len(ActiveElevatorMap) >= 2 {
+				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
+					// init a backup here:
+					fmt.Println("Backup does not exists yet. Initializing it..")
+					BackupAddr = GetBackupAddress(ActiveElevatorMap)
+					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
+				}
+				fmt.Println("Break1")
+				TCPSendButtonEvent(backupConn, CompletedOrder) // Writing to Backup
+				fmt.Println("Break2")
+			}
+
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			delete(ActiveElevatorMap, disconnectedElevator)
 		}
 	}
+}
+
+func GetBackupAddress(ActiveElevatorMap map[string]elevator.Elevator) string {
+	for key, _ := range ActiveElevatorMap {
+		if key != GetLocalIPv4() {
+			return key
+		}
+	}
+	return "err"
+}
+
+func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.ActiveElevator) {
+	time.Sleep(50 * time.Millisecond)
+	my_ActiveElevatorMsg := MsgActiveElevator{
+		Type:    TypeActiveElevator,
+		Content: activeElevator,
+	}
+	fmt.Println("my_ActiveElevatorMsg:", my_ActiveElevatorMsg)
+	data, err := json.Marshal(my_ActiveElevatorMsg)
+	fmt.Println("Break-data", data)
+	if err != nil {
+		fmt.Println("Error encoding ActiveElevator to json: ", err)
+		return
+	}
+	fmt.Println("Break3")
+	_, err = conn.Write(data)
+	if err != nil {
+		fmt.Println("Error sending ActiveElevator: ", err)
+		return
+	}
+	time.Sleep(50 * time.Millisecond)
+	fmt.Println("Break4")
+}
+
+func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
+	my_ButtonEventMsg := MsgButtonEvent{
+		Type:    TypeButtonEvent,
+		Content: buttonEvent,
+	}
+
+	data, err := json.Marshal(my_ButtonEventMsg)
+	if err != nil {
+		fmt.Println("Error encoding ButtonEvent to json: ", err)
+		return
+	}
+
+	_, err = conn.Write(data)
+	if err != nil {
+		fmt.Println("Error sending ButtonEvent: ", err)
+		return
+	}
+	time.Sleep(50 * time.Millisecond)
 }
 
 /*
