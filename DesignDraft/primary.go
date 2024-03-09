@@ -68,8 +68,11 @@ func HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators) {
 			if backup == nil {
 				if len(ActiveElevators) > 1 {
 					//init a backup
+					// dial your backup -> get a conn -> send states
 				}
 			}
+
+			
 
 			if  len(ActiveElevators) > 1 {
 				//TODO: assign  new backup if needed based based on state update.

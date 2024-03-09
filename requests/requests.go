@@ -4,7 +4,6 @@ import (
 	"elevator/elevator"
 	"elevator/elevio"
 	"fmt"
-
 	//"elevator/fsm"
 )
 
@@ -43,9 +42,9 @@ func RequestsHere(e elevator.Elevator) bool {
 
 func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehaviour) { // Elevator doesn't have a motorDirection, but it does have a Dirn
 	// Temporary debug output to understand the state of requests
-    fmt.Println("Requests Above:", RequestsAbove(e))
-    fmt.Println("Requests Here:", RequestsHere(e))
-    fmt.Println("Requests Below:", RequestsBelow(e))
+	fmt.Println("Requests Above:", RequestsAbove(e))
+	fmt.Println("Requests Here:", RequestsHere(e))
+	fmt.Println("Requests Below:", RequestsBelow(e))
 
 	if RequestsAbove(e) {
 		e.Dirn = elevio.D_Up
@@ -85,11 +84,11 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
 		if RequestsHere(e) {
 			println("Request here")
 			return elevio.D_Up, elevator.EB_DoorOpen
-		} 
+		}
 
 	}
 	println("Request stop")
-	return elevio.D_Stop, elevator.EB_Idle 	
+	return elevio.D_Stop, elevator.EB_Idle
 }
 
 func ShouldStop(e elevator.Elevator) bool {
@@ -117,7 +116,7 @@ func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
-func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator { // not finished
+func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) elevator.Elevator { // not finished
 	// Implement logic based on e.Config.ClearRequestVariant
 	// Update e.Requests accordingly
 
@@ -126,6 +125,8 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator { // not finishe
 		for Button := 0; Button < elevio.N_Buttons; Button++ { // Check this
 			e.Requests[e.Floor][Button] = false
 		}
+		FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
+		FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 
 	case elevator.CV_InDoorn:
 		e.Requests[e.Floor][elevio.BT_Cab] = false
@@ -133,17 +134,22 @@ func ClearAtCurrentFloor(e elevator.Elevator) elevator.Elevator { // not finishe
 		case elevio.D_Up:
 			if !RequestsAbove(e) && !e.Requests[e.Floor][elevio.B_HallUp] {
 				e.Requests[e.Floor][elevio.B_HallDown] = false
+				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 			}
 		case elevio.D_Down:
 			if !RequestsBelow(e) && !e.Requests[e.Floor][elevio.B_HallDown] {
 				e.Requests[e.Floor][elevio.B_HallUp] = false
+				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
 			}
 			e.Requests[e.Floor][elevio.B_HallDown] = false
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 		case elevio.D_Stop:
 			break
 		default:
 			e.Requests[e.Floor][elevio.B_HallUp] = false
 			e.Requests[e.Floor][elevio.B_HallDown] = false
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 		}
 	}
 

@@ -1,5 +1,6 @@
 package network
 
+/*
 import (
 	"context"
 	"fmt"
@@ -20,7 +21,7 @@ func SecondaryRoutine() {
 	Receiver(ctx, DETECTION_PORT)
 }
 
-/*
+
 func BecomeBackup() {
 
 }

@@ -34,8 +34,7 @@ type ActiveElevator struct {
 // Consider an array called "ActiveElevators" of objects (or pointers to objects) of type elevio.Elevator, where each elevio.Elevator corresponds to an "active/alive" elevator, that can take requests.
 // Make a function HallRequestAssigner that takes in "ActiveElevators" and spits out a similar array of elevio.Elevator objects with newly assigned requests. This array will be fed to the fsm of the individual elevators.
 
-func ActiveElevators_to_CombinedHallRequests(ActiveElevators []ActiveElevator) [elevio.N_Floors][2]bool {
-	var CombinedHallRequests [elevio.N_Floors][2]bool
+func ActiveElevators_to_CombinedHallRequests(ActiveElevators []ActiveElevator, CombinedHallRequests [elevio.N_Floors][2]bool) [elevio.N_Floors][2]bool {
 
 	for i := 0; i < len(ActiveElevators); i++ {
 		for floor := 0; floor < elevio.N_Floors; floor++ {
@@ -46,7 +45,7 @@ func ActiveElevators_to_CombinedHallRequests(ActiveElevators []ActiveElevator) [
 	return CombinedHallRequests
 }
 
-func ActiveElevators_to_HRAInput(ActiveElevators []ActiveElevator) HRAInput {
+func ActiveElevators_to_HRAInput(ActiveElevators []ActiveElevator, CombinedHallRequests [elevio.N_Floors][2]bool) HRAInput {
 	StateMap := make(map[string]HRAElevState)
 	for _, activeElevator := range ActiveElevators {
 		//StateMap[ActiveElevators[i].MyAddress] = ActiveElevatorsToHRAElevatorState(ActiveElevators[i])
@@ -54,7 +53,7 @@ func ActiveElevators_to_HRAInput(ActiveElevators []ActiveElevator) HRAInput {
 	}
 
 	input := HRAInput{
-		HallRequests: ActiveElevators_to_CombinedHallRequests(ActiveElevators),
+		HallRequests: CombinedHallRequests,
 		States:       StateMap,
 	}
 	return input
@@ -119,7 +118,7 @@ func InitActiveElevator() ActiveElevator {
 	}
 }
 
-func HallRequestAssigner(ActiveElevators []ActiveElevator) []ActiveElevator {
+func HallRequestAssigner(ActiveElevators []ActiveElevator, CombinedHallRequests [elevio.N_Floors][2]bool) []ActiveElevator {
 
 	hraExecutable := ""
 	switch runtime.GOOS {
@@ -131,7 +130,7 @@ func HallRequestAssigner(ActiveElevators []ActiveElevator) []ActiveElevator {
 		panic("OS not supported")
 	}
 
-	input := ActiveElevators_to_HRAInput(ActiveElevators)
+	input := ActiveElevators_to_HRAInput(ActiveElevators, CombinedHallRequests)
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {

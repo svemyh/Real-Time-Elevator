@@ -14,6 +14,7 @@ import (
 
 var DETECTION_PORT string = ":20017"
 var TCP_LISTEN_PORT string = ":10001"
+var TCP_BACKUP_PORT string = ":15000"
 
 type MessageType string
 
@@ -146,18 +147,70 @@ func Transmitter(TCPPort string) {
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(ctx context.Context, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent) {
+func InitNetwork(ctx context.Context, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string) {
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT)
 	if isPrimary {
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh)
+		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary("localhost"+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh)
 	} else {
 		log.Println("Operating as client...")
-		TCPDialPrimary(primaryAddress, FSMStateUpdateCh, FSMHallOrderCompleteCh)
-		go SecondaryRoutine()
+		go TCPDialPrimary(primaryAddress, FSMStateUpdateCh, FSMHallOrderCompleteCh)
+		go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh)
+		conn, _ := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
+		BackupRoutine(conn, primaryAddress)
 	}
+}
+
+// Checks the event that a backup has become a new primary and wants to establish connection. This go routine should be shut down at some point
+func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
+	fmt.Println("- Executing TCPListenForNewPrimary()")
+	//listen for new elevators on TCP port
+	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
+	//go TCPReadElevatorStates(stateUpdateCh)
+	ls, err := net.Listen("tcp", TCPPort)
+	if err != nil {
+		fmt.Println("The connection failed. Error:", err)
+		return
+	}
+	defer ls.Close()
+
+	fmt.Println("Primary is listening for new connections to port:", TCPPort)
+	for {
+		conn, err := ls.Accept()
+		if err != nil {
+			fmt.Println("Error: ", err)
+			continue
+		}
+		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
+	}
+}
+
+// will simply be a net.Listen("TCP", "TCP_BACKUP_PORT"). This blocks code until a connection is established
+func TCPListenForBackupPromotion(port string) (net.Conn, error) {
+	fmt.Println(" - Executing TCPListenForBackupPromotion()")
+
+	ls, err := net.Listen("tcp", port)
+	if err != nil {
+		fmt.Println("The connection failed. Error:", err)
+		return nil, err
+	}
+	defer ls.Close()
+
+	fmt.Println("Primary is listening for new connections to port:", port)
+	for {
+		conn, err := ls.Accept()
+		if err != nil {
+			fmt.Println("Error: ", err)
+			continue
+		}
+		return conn, nil
+	}
+}
+
+func SecondaryRoutine(conn net.Conn) {
+	fmt.Println("I'm a Secondary, doing Secondary things")
 }
 
 func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
@@ -172,6 +225,13 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 	fmt.Println("Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
 
+	sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh)
+}
+
+func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
+	fmt.Println("Conection established to: ", conn.RemoteAddr())
+	defer conn.Close()
+
 	for {
 		select {
 		case stateUpdate := <-FSMStateUpdateCh:
@@ -183,12 +243,15 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 
 			data, err := json.Marshal(my_ActiveElevatorMsg)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println("Error sending to Primary: ", err)
+				return
 			}
 
+			fmt.Println("Writing a ActiveElevator to the Primary:", stateUpdate)
 			_, err = conn.Write(data)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println("Error sending to Primary: ", err)
+				return
 			}
 
 		case hallOrderComplete := <-FSMHallOrderCompleteCh:
@@ -200,25 +263,26 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 
 			data, err := json.Marshal(my_ButtonEventMsg)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println("Error sending to Primary: ", err)
+				return
 			}
 
 			fmt.Println("Writing a ButtonEvent to the Primary:", hallOrderComplete)
 			_, err = conn.Write(data)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println("Error sending to Primary: ", err)
+				return
 			}
 
 		}
 	}
-
 }
 
 //receiverChan := make(chan string)
 //go network.Reciever(receiverChan, "localhost:20013")
 
 // Alias: Server()
-func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent) {
+func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string) {
 	//TODO:Read the states and store in a buffer
 	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
@@ -236,6 +300,8 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		var buf [1024]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
+			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
+			DisconnectedElevatorCh <- conn.LocalAddr().String()
 			log.Fatal(err)
 		}
 
@@ -268,6 +334,19 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			fmt.Println("Unknown message type")
 		}
 	}
+}
+
+func TCPDialBackup(address string, port string) net.Conn {
+	fmt.Println("Connecting by TCP to the address: ", address)
+
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		fmt.Println("Connection failed. Error: ", err)
+		return nil
+	}
+
+	fmt.Println("Conection established to: ", conn.RemoteAddr())
+	return conn
 }
 
 // Can be used for testing purposes for writing either a ActiveElevator or ButtonEvent to TCPReadElevatorStates

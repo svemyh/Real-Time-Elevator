@@ -4,6 +4,7 @@ import (
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
+	"elevator/network"
 	"elevator/requests"
 	"elevator/timer"
 	"fmt"
@@ -46,7 +47,7 @@ func FsmOnInitBetweenFloors() {
 	elevatorState.Behaviour = elevator.EB_Moving
 }
 
-func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
+func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	//fmt.Printf("\n\n%s(%d, %s)\n", "FsmOnRequestButtonPress", btnFloor, elevio.ButtonToString(btnType))
 	//elevatorPrint(elevator)
 
@@ -66,6 +67,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 	case elevator.EB_Idle:
 		//println("Idle")
 		elevatorState.Requests[btnFloor][btnType] = true
+
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 
 		switch elevatorState.Behaviour {
@@ -73,7 +75,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 			//fmt.Println("EB_DoorOpen")
 			outputDevice.DoorLight = true
 			timer.TimerStart(5)
-			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
+			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh)
 
 		case elevator.EB_Moving:
 			elevio.SetMotorDirection(elevatorState.Dirn)
@@ -81,9 +83,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 
 		case elevator.EB_Idle:
 			//fmt.Println("EB_Idle")
-
 		}
-
 	}
 
 	SetAllLights()
@@ -91,7 +91,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button) {
 	//fmt.Println("\nNew state:")
 }
 
-func FsmOnFloorArrival(newFloor int) {
+func FsmOnFloorArrival(newFloor int, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	//fmt.Printf("\nArrived at floor %d\n", newFloor)
 	elevatorState.Floor = newFloor
 	elevio.SetFloorIndicator(elevatorState.Floor)
@@ -102,7 +102,7 @@ func FsmOnFloorArrival(newFloor int) {
 			fmt.Println("Should stop")
 			elevio.SetMotorDirection(elevio.D_Stop)
 			elevio.SetDoorOpenLamp(true)
-			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
+			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh)
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
 			SetAllLights()
 			elevatorState.Behaviour = elevator.EB_DoorOpen
@@ -110,12 +110,11 @@ func FsmOnFloorArrival(newFloor int) {
 	default:
 		break
 	}
-
 	//fmt.Printf("\nNew state:\n")
 
 }
 
-func FsmOnDoorTimeout() {
+func FsmOnDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	fmt.Println("\nDoor timeout")
 
 	switch elevatorState.Behaviour {
@@ -125,7 +124,7 @@ func FsmOnDoorTimeout() {
 		case elevator.EB_DoorOpen:
 			//fmt.Println("EB Door Open")
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
-			elevatorState = requests.ClearAtCurrentFloor(elevatorState)
+			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh)
 			SetAllLights()
 		case elevator.EB_Moving:
 			//fmt.Println("EB moving")
@@ -148,7 +147,6 @@ func FsmOnDoorTimeout() {
 func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 
 	//elevatorState = elevator.ElevatorInit()
-
 	var prev int = -1
 	log.Println("is in fsm")
 
@@ -158,32 +156,47 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 
 	// Polling for new actions/events of the system.
 	for {
-
 		select {
 		case floor := <-device.FloorSensorCh:
 			//fmt.Println("Floor Sensor:", floor)
-			if floor != -1 && floor != prev {
-				FsmOnFloorArrival(floor)
-				//sendToMaster
+			if floor != -1 && floor != prev { // Maybe this logic is redundant? TODO: Check it at later time.
+				FsmOnFloorArrival(floor, FSMHallOrderCompleteCh)
+
+				// Send current elevator to master
+				toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
+					Elevator:  elevatorState,
+					MyAddress: network.GetLocalIPv4(),
+				}
+				FSMStateUpdateCh <- toBeSentActiveElevatorState // Remember to maybe implement: If the primary-local-fsm-loop takes too long time - each new ButtonEvent from localfsm needs to be ORed at the primary side instead of the Primary simply reading latest command. Danger for overwriting.
 			}
 			prev = floor
 
 		case buttonEvent := <-device.RequestButtonCh:
-			//fmt.Println("Button Pressed:", buttonEvent)
-			FSMHallOrderCompleteCh <- buttonEvent
-			FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button)) // is called when an order is recieved from primary
+			toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
+				Elevator:  elevatorState,
+				MyAddress: network.GetLocalIPv4(),
+			}
+			toBeSentActiveElevatorState.Elevator.Requests[buttonEvent.Floor][buttonEvent.Button] = true
+			FSMStateUpdateCh <- toBeSentActiveElevatorState // Remember to maybe implement: If the primary-local-fsm-loop takes too long time - each new ButtonEvent from localfsm needs to be ORed at the primary side instead of the Primary simply reading latest command. Danger for overwriting.
+
+			if buttonEvent.Button == elevio.ButtonType(elevio.B_Cab) {
+				FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button), FSMHallOrderCompleteCh)
+			}
+
+			//FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button)) // is called when an order is recieved from primary
 
 		case obstructionSignal := <-device.ObstructionCh:
 			fmt.Println("Obstruction Detected", obstructionSignal)
+			// TODO: Implement later
 
 		default:
 			// No action - prevents blocking on channel reads
 			time.Sleep(200 * time.Millisecond)
 		}
-		if timer.TimerTimedOut() { // should be reworked into a channel. TBC
+		if timer.TimerTimedOut() { // should be reworked into a channel. TODO: Implement later
 			timer.TimerStop()
-			FsmOnDoorTimeout()
+			FsmOnDoorTimeout(FSMHallOrderCompleteCh)
+			// TODO: Implement acceptance tests here?: IF local error (motor failure or other) is detected this infomation can be fed to PrimaryHandler().
 		}
-
 	}
 }
