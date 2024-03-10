@@ -9,6 +9,8 @@ import (
 	"log"
 	"net"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -33,6 +35,12 @@ type MsgActiveElevator struct {
 type MsgButtonEvent struct {
 	Type    MessageType        `json:"type"`
 	Content elevio.ButtonEvent "json:content"
+}
+
+type ClientUpdate struct {
+	Client []string
+	New   string
+	Lost  []string
 }
 
 /*
@@ -148,7 +156,9 @@ func Transmitter(TCPPort string) {
 
 // Alias: RunPrimaryBackup()
 func InitNetwork(ctx context.Context, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
-	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT)
+	clientUpdateCh := make(chan ClientUpdate)
+	//clientTxEnable := make(chan bool)
+	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT, clientUpdateCh)
 	if isPrimary {
 		log.Println("Operating as primary...")
 		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh)
@@ -209,7 +219,6 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 		return conn, nil
 	}
 }
-
 
 func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	fmt.Println("Connecting by TCP to the address: ", PrimaryAddress)
@@ -516,4 +525,12 @@ func GetLocalIPv4() string {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
 	return localAddr.IP.String()
+}
+
+func StringPortToInt(port string) int {
+	portWithoutColon := strings.TrimPrefix(port, ":")
+
+	portInt, _ := strconv.Atoi(portWithoutColon)
+
+	return portInt
 }

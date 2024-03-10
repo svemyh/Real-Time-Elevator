@@ -2,13 +2,17 @@ package network
 
 import (
 	"context"
+	"elevator/conn"
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
-	"fmt"
 	"log"
+
+	"fmt"
+	//"log"
 	"net"
+	//"reflect"
 	"time"
 )
 
@@ -16,6 +20,13 @@ type Primary struct {
 	Ip       string
 	lastSeen time.Time
 }
+
+type typeTaggedJSON struct {
+	TypeId string
+	JSON   []byte
+}
+
+const bufSize = 1024
 
 /*
 func RunPrimaryBackup(necessarychannels...) {
@@ -40,6 +51,8 @@ bool
 */
 
 // OR's the new hall requests
+
+
 func UpdateCombinedHallRequests(ActiveElevatorsMap map[string]elevator.Elevator, CombinedHallRequests [elevio.N_Floors][2]bool) [elevio.N_Floors][2]bool {
 
 	for _, elev := range ActiveElevatorsMap {
@@ -51,111 +64,121 @@ func UpdateCombinedHallRequests(ActiveElevatorsMap map[string]elevator.Elevator,
 	return CombinedHallRequests
 }
 
-func UDPBroadCastPrimaryRole(ctx context.Context, port string) { //remove ctx
+// creds to network-go module 
+func UDPBroadCastPrimaryRole(ctx context.Context, p string, transmitEnable <-chan bool) { //remove ctx
 
-	//def our local address
-	laddr, err := net.ResolveUDPAddr("udp", ":0") // Using the zero-port
-	if err != nil {
-		fmt.Println("Error resolving UDP address:", err)
-		return
-	}
+	port := StringPortToInt(p)
 
-	//def remote addr
-	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("10.100.23.191%s", port)) //addressString to actual address(server/)
-	if err != nil {
-		fmt.Println("Error resolving UDP address:", err)
-		return
-	}
+	key := "OptimusPrime"
 
-	//create a connection to raddr through a socket object
-	sockConn, err := net.DialUDP("udp", laddr, raddr)
-	if err != nil {
-		fmt.Println("Error connecting:", err)
-		return
-	}
-
-	defer sockConn.Close()
-
-	for {
-		//select {
-		//case <-ctx.Done(): //?
-		//	return
-		//default:
-		message := "OptimusPrime"
-
-		sockConn.Write([]byte(message))
-		//_, err := sockConn.Write([]byte(message))
-		//fmt.Printf("Broadcasting: %s\n", message)
-		//if err != nil {
-		//	log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
-		//}
-		time.Sleep(1 * time.Second)
-		//}
-	}
-}
-
-func AmIPrimary(addressString string) (bool, string) {
-	/*
-
-	port :=  10002
-
-	var buf [1024]byte
 
 	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
-	n, _, e := conn.ReadFrom(buf[0:])
 
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
+	enable := true
 	for {
-	if e != nil {
-		fmt.Printf("bcast.Receiver(%d, ...):ReadFrom() failed: \"%+v\"\n", port, e)
-		if netErr, ok := e.(net.Error); ok && netErr.Timeout() {
-			log.Printf("Timeout reached without receiving %s, becoming primary...", buf[:n])
-			return true, "none"
+
+		select {
+		case enable = <-transmitEnable:
+		case <-time.After(interval):
 		}
-		log.Printf("Error reading from UDP: %v\n", e)
-		return false, "err"
+		if enable {
+			conn.WriteTo([]byte(key), addr)
+		}
 	}
-}
-*/
-
+	/*
 	
-		addr, err := net.ResolveUDPAddr("udp", addressString)
-		if err != nil {
-			log.Printf("Error resolving UDP address: %v\n", err)
-			return false, "err"
+	checkArgs(chans...)
+	typeNames := make([]string, len(chans))
+	selectCases := make([]reflect.SelectCase, len(typeNames))
+	for i, ch := range chans {
+		selectCases[i] = reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(ch),
 		}
-
-		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			log.Printf("Error listening on UDP: %v\n", err)
-			return false, "err"
-		}
-		defer conn.Close()
-	
-
-	/*conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	buffer := make([]byte, 1024)
-	_, primaryAddr, err := conn.ReadFromUDP(buffer)
-	if err != nil {
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() { // assert error to net.Error as this type can be checked as a timeout error
-			log.Println("No message received, becoming primary...")
-			return true, "err"
-		}
-		log.Printf("Error reading from UDP: %v\n", err)
+		typeNames[i] = reflect.TypeOf(ch).Elem().String()
 	}
-	log.Println("Received broadcast from primary, remaining as client...")
 
-	fmt.Println("Message 'I'm Primary' recieved from the address: ", primaryAddr.String())
-	return false, primaryAddr.String()
+	port := StringPortToInt(p)
+	conn := conn.DialBroadcastUDP(port)
+	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
+	for {
+		chosen, value, _ := reflect.Select(selectCases)
+		jsonstr, _ := json.Marshal(value.Interface())
+		ttj, _ := json.Marshal(typeTaggedJSON{
+			TypeId: typeNames[chosen],
+			JSON:   jsonstr,
+		})
+		if len(ttj) > bufSize {
+			panic(fmt.Sprintf(
+				"Tried to send a message longer than the buffer size (length: %d, buffer size: %d)\n\t'%s'\n"+
+					"Either send smaller packets, or go to network/bcast/bcast.go and increase the buffer size",
+				len(ttj), bufSize, string(ttj)))
+		}
+		conn.WriteTo(ttj, addr)
+
+	} */
+	/*
+			//def our local address
+			laddr, err := net.ResolveUDPAddr("udp", ":0") // Using the zero-port
+			if err != nil {
+				fmt.Println("Error resolving UDP address:", err)
+				return
+			}
+
+			//def remote addr
+			raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("10.100.23.191%s", port)) //addressString to actual address(server/)
+			if err != nil {
+				fmt.Println("Error resolving UDP address:", err)
+				return
+			}
+
+			//create a connection to raddr through a socket object
+			sockConn, err := net.DialUDP("udp", laddr, raddr)
+			if err != nil {
+				fmt.Println("Error connecting:", err)
+				return
+			}
+
+			defer sockConn.Close()
+
+			for {
+				//select {
+				//case <-ctx.Done(): //?
+				//	return
+				//default:
+				message := "OptimusPrime"
+
+				sockConn.Write([]byte(message))
+				//_, err := sockConn.Write([]byte(message))
+				//fmt.Printf("Broadcasting: %s\n", message)
+				//if err != nil {
+				//	log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
+				//}
+				time.Sleep(1 * time.Second)
+				//}
+			}
+		}
 	*/
-	
-	// Set a deadline for reading. Read operations will fail if no data is received after 5 seconds.
-	
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+}
+
+const interval = 15 * time.Millisecond
+const timeout time.Duration = 500 * time.Millisecond // 500ms
+
+func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, string) { 
+
+	//var buf [1024]byte
+	//var p ClientUpdate
+	//lastSeen := make(map[string]time.Time)
+	port := StringPortToInt(addressString)
+
+	conn := conn.DialBroadcastUDP(port)
+	conn.SetReadDeadline(time.Now().Add(interval))
 
 	for {
 		buffer := make([]byte, 1024)
-		n, addr, err := conn.ReadFromUDP(buffer)
+		n, addr, err := conn.ReadFrom(buffer)
+
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("Timeout reached without receiving %s, becoming primary...", buffer[:n])
@@ -172,9 +195,89 @@ func AmIPrimary(addressString string) (bool, string) {
 		}
 		// If received message is not "HelloWorld", keep listening until timeout
 	}
+	/*
+	for {
+		//updated := false
+		n, _, _ := conn.ReadFrom(buf[0:])
+
+		id := string(buf[:n])
+
+		// Adding new connection
+		p.New = ""
+		if id != "" {
+			if _, idExists := lastSeen[id]; !idExists {
+				p.New = id
+		//		updated = true
+			}
+
+			lastSeen[id] = time.Now()
+		}
+
+		// Removing dead connection
+		p.Lost = make([]string, 0)
+		for k, v := range lastSeen {
+			if time.Now().Sub(v) > timeout {
+		//		updated = true
+				p.Lost = append(p.Lost, k)
+				delete(lastSeen, k)
+			}
+		}*/
+/*
+		// Sending update
+		if updated {
+			p.Peers = make([]string, 0, len(lastSeen))
+
+			for k, _ := range lastSeen {
+				p.Peers = append(p.Peers, k)
+			}
+
+			sort.Strings(p.Peers)
+			sort.Strings(p.Lost)
+			peerUpdateCh <- p
+		}
+	} */
+	/*
+
+		addr, err := net.ResolveUDPAddr("udp", addressString)
+		if err != nil {
+			log.Printf("Error resolving UDP address: %v\n", err)
+			return false, "err"
+		}
+
+		conn, err := net.ListenUDP("udp", addr)
+		if err != nil {
+			log.Printf("Error listening on UDP: %v\n", err)
+			return false, "err"
+		}
+		defer conn.Close()
+	*/
+
+	/*conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	buffer := make([]byte, 1024)
+	_, primaryAddr, err := conn.ReadFromUDP(buffer)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() { // assert error to net.Error as this type can be checked as a timeout error
+			log.Println("No message received, becoming primary...")
+			return true, "err"
+		}
+		log.Printf("Error reading from UDP: %v\n", err)
+	}
+	log.Println("Received broadcast from primary, remaining as client...")
+
+	fmt.Println("Message 'I'm Primary' recieved from the address: ", primaryAddr.String())
+	return false, primaryAddr.String()
+	*/
+
+	// Set a deadline for reading. Read operations will fail if no data is received after 5 seconds.
+	/*
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
 	
-	
+
+
+*/
 }
+
 
 func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	//listen for new elevators on TCP port
@@ -208,7 +311,8 @@ func PrimaryRoutine(StateUpdateCh chan hall_request_assigner.ActiveElevator, Hal
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go UDPBroadCastPrimaryRole(ctx, DETECTION_PORT)                                                                                //Continously broadcast that you are a primary on UDP
+	peerTxEnable := make(chan bool)
+	go UDPBroadCastPrimaryRole(ctx, DETECTION_PORT, peerTxEnable)                                                                                //Continously broadcast that you are a primary on UDP
 	go TCPListenForNewElevators(TCP_LISTEN_PORT, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
 	InitActiveElevators := make([]hall_request_assigner.ActiveElevator, 0)
 	go HandlePrimaryTasks(StateUpdateCh, HallOrderCompleteCh, InitActiveElevators, DisconnectedElevatorCh, AssignHallRequestsCh)
