@@ -52,15 +52,16 @@ func UpdateCombinedHallRequests(ActiveElevatorsMap map[string]elevator.Elevator,
 }
 
 func UDPBroadCastPrimaryRole(ctx context.Context, port string) { //remove ctx
+
 	//def our local address
-	laddr, err := net.ResolveUDPAddr("udp", DETECTION_PORT) // Using the zero-port
+	laddr, err := net.ResolveUDPAddr("udp", ":0") // Using the zero-port
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
 	}
 
 	//def remote addr
-	raddr, err := net.ResolveUDPAddr("udp", port) //addressString to actual address(server/)
+	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("10.100.23.191%s", port)) //addressString to actual address(server/)
 	if err != nil {
 		fmt.Println("Error resolving UDP address:", err)
 		return
@@ -94,18 +95,43 @@ func UDPBroadCastPrimaryRole(ctx context.Context, port string) { //remove ctx
 }
 
 func AmIPrimary(addressString string) (bool, string) {
-	addr, err := net.ResolveUDPAddr("udp", addressString)
-	if err != nil {
-		log.Printf("Error resolving UDP address: %v\n", err)
-		return false, "err"
-	}
+	/*
 
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		log.Printf("Error listening on UDP: %v\n", err)
+	port :=  10002
+
+	var buf [1024]byte
+
+	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
+	n, _, e := conn.ReadFrom(buf[0:])
+
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	for {
+	if e != nil {
+		fmt.Printf("bcast.Receiver(%d, ...):ReadFrom() failed: \"%+v\"\n", port, e)
+		if netErr, ok := e.(net.Error); ok && netErr.Timeout() {
+			log.Printf("Timeout reached without receiving %s, becoming primary...", buf[:n])
+			return true, "none"
+		}
+		log.Printf("Error reading from UDP: %v\n", e)
 		return false, "err"
 	}
-	defer conn.Close()
+}
+*/
+
+	
+		addr, err := net.ResolveUDPAddr("udp", addressString)
+		if err != nil {
+			log.Printf("Error resolving UDP address: %v\n", err)
+			return false, "err"
+		}
+
+		conn, err := net.ListenUDP("udp", addr)
+		if err != nil {
+			log.Printf("Error listening on UDP: %v\n", err)
+			return false, "err"
+		}
+		defer conn.Close()
+	
 
 	/*conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	buffer := make([]byte, 1024)
@@ -122,8 +148,9 @@ func AmIPrimary(addressString string) (bool, string) {
 	fmt.Println("Message 'I'm Primary' recieved from the address: ", primaryAddr.String())
 	return false, primaryAddr.String()
 	*/
-
+	
 	// Set a deadline for reading. Read operations will fail if no data is received after 5 seconds.
+	
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
 	for {
@@ -145,6 +172,8 @@ func AmIPrimary(addressString string) (bool, string) {
 		}
 		// If received message is not "HelloWorld", keep listening until timeout
 	}
+	
+	
 }
 
 func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
