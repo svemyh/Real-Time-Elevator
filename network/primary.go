@@ -51,7 +51,7 @@ func UpdateCombinedHallRequests(ActiveElevatorsMap map[string]elevator.Elevator,
 	return CombinedHallRequests
 }
 
-func UDPBroadCastPrimaryRole(ctx context.Context, port string) {
+func UDPBroadCastPrimaryRole(ctx context.Context, port string) { //remove ctx
 	//def our local address
 	laddr, err := net.ResolveUDPAddr("udp", DETECTION_PORT) // Using the zero-port
 	if err != nil {
@@ -68,24 +68,28 @@ func UDPBroadCastPrimaryRole(ctx context.Context, port string) {
 
 	//create a connection to raddr through a socket object
 	sockConn, err := net.DialUDP("udp", laddr, raddr)
+	if err != nil {
+		fmt.Println("Error connecting:", err)
+		return
+	}
 
 	defer sockConn.Close()
 
 	for {
-		select {
-		case <-ctx.Done(): //?
-			return
-		default:
-			message := "OptimusPrime"
+		//select {
+		//case <-ctx.Done(): //?
+		//	return
+		//default:
+		message := "OptimusPrime"
 
-			sockConn.Write([]byte(message))
-			//_, err := sockConn.Write([]byte(message))
-			//fmt.Printf("Broadcasting: %s\n", message)
-			//if err != nil {
-			//	log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
-			//}
-			time.Sleep(1 * time.Second)
-		}
+		sockConn.Write([]byte(message))
+		//_, err := sockConn.Write([]byte(message))
+		//fmt.Printf("Broadcasting: %s\n", message)
+		//if err != nil {
+		//	log.Printf("Error broadcasting primary role: No one is trying to connect!\n")
+		//}
+		time.Sleep(1 * time.Second)
+		//}
 	}
 }
 
@@ -127,7 +131,7 @@ func AmIPrimary(addressString string) (bool, string) {
 		n, addr, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				log.Println("Timeout reached without receiving 'OptimusPrime', becoming primary...")
+				log.Printf("Timeout reached without receiving %s, becoming primary...", buffer[:n])
 				return true, "none"
 			}
 			log.Printf("Error reading from UDP: %v\n", err)
@@ -136,7 +140,7 @@ func AmIPrimary(addressString string) (bool, string) {
 
 		message := string(buffer[:n])
 		if message == "OptimusPrime" {
-			log.Println("Received 'OptimusPrime' from primary, remaining as client...")
+			log.Printf("Received %s from primary, remaining as client...", message)
 			return false, addr.String()
 		}
 		// If received message is not "HelloWorld", keep listening until timeout
@@ -232,6 +236,7 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 			CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
 			AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 			fmt.Println("ØØØØØØØØØØ - Combinded -ØØØØØØØØØØØØ", CombinedHallRequests)
+
 			//if len(ActiveElevators) > 1 {
 			//TODO: assign  new backup if needed based based on state update.
 			//TODO: send updated states to backup (with ack) (if there still is a backup)
@@ -264,6 +269,9 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 				TCPSendButtonEvent(backupConn, CompletedOrder) // Writing to Backup
 				fmt.Println("Break2")
 			}
+
+			CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
+			AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			delete(ActiveElevatorMap, disconnectedElevator)

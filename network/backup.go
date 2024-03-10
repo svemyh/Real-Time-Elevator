@@ -46,7 +46,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 		n, _, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				log.Println("Timeout reached without receiving 'OptimusPrime', becoming primary...")
+				log.Printf("Timeout reached without receiving %s, becoming primary...", buffer[:n])
 				PrimaryDeadCh <- true
 				return
 			}
@@ -56,7 +56,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 
 		message := string(buffer[:n])
 		if message == "OptimusPrime" {
-			log.Println("Received 'OptimusPrime' from primary, remaining as client...")
+			log.Printf("Received %s from primary, remaining as client...", message)
 			conn.SetReadDeadline(time.Now().Add(5 * time.Second)) // Reset readDeadline
 		}
 		// If received message is not "OptimusPrime", keep listening until timeout

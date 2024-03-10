@@ -210,9 +210,6 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 	}
 }
 
-func SecondaryRoutine(conn net.Conn) {
-	fmt.Println("I'm a Secondary, doing Secondary things")
-}
 
 func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	fmt.Println("Connecting by TCP to the address: ", PrimaryAddress)
