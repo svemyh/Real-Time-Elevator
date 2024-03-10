@@ -26,6 +26,9 @@ func main() {
 	StateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
 	HallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
 	DisconnectedElevatorCh := make(chan string, 1024)
+	FSMAssignedHallRequestsCh :=  make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
+	AssignHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
+
 
 	//fsm_terminate := make(chan, bool)
 
@@ -37,9 +40,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go network.InitNetwork(ctx, FSMStateUpdateCh, FSMHallOrderCompleteCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh) // Alias: RunPrimaryBackup()
+	go network.InitNetwork(ctx, FSMStateUpdateCh, FSMHallOrderCompleteCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, FSMAssignedHallRequestsCh, AssignHallRequestsCh) // Alias: RunPrimaryBackup()
 
-	go fsm.FsmRun(device, FSMStateUpdateCh, FSMHallOrderCompleteCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
+	go fsm.FsmRun(device, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
 	go network.RestartOnReconnect()
 

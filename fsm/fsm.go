@@ -54,7 +54,6 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCo
 	switch elevatorState.Behaviour {
 	case elevator.EB_DoorOpen:
 		//println("Door Open")
-		fmt.Println("BREAKPOINT 1")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
 			timer.TimerStart(5)
 		} else {
@@ -62,21 +61,15 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCo
 		}
 
 	case elevator.EB_Moving:
-		//println("Moving")
-		fmt.Println("BREAKPOINT 2")
 		elevatorState.Requests[btnFloor][btnType] = true
 
 	case elevator.EB_Idle:
-		//println("Idle")
-		fmt.Println("BREAKPOINT 3")
 		elevatorState.Requests[btnFloor][btnType] = true
 
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
-			//fmt.Println("EB_DoorOpen")
-			fmt.Println("BREAKPOINT 4")
 			outputDevice.DoorLight = true
 			timer.TimerStart(5)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh)
@@ -148,7 +141,7 @@ func FsmOnDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	//fmt.Printf("\nNew state:\n")
 }
 
-func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
+func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 
 	//elevatorState = elevator.ElevatorInit()
 	var prev int = -1
@@ -193,6 +186,16 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 		case obstructionSignal := <-device.ObstructionCh:
 			fmt.Println("Obstruction Detected", obstructionSignal)
 			// TODO: Implement later
+
+		case AssignedHallRequests := <-FSMAssignedHallRequestsCh:
+			for i := 0; i < elevio.N_Floors; i++ {
+				for j := 0; j < 2; j++ {
+					if AssignedHallRequests[i][j] {
+						FsmOnRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh)
+						time.Sleep(50 * time.Millisecond)
+					}
+				}
+			}
 
 		default:
 			// No action - prevents blocking on channel reads

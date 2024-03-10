@@ -34,22 +34,13 @@ type ActiveElevator struct {
 // Consider an array called "ActiveElevators" of objects (or pointers to objects) of type elevio.Elevator, where each elevio.Elevator corresponds to an "active/alive" elevator, that can take requests.
 // Make a function HallRequestAssigner that takes in "ActiveElevators" and spits out a similar array of elevio.Elevator objects with newly assigned requests. This array will be fed to the fsm of the individual elevators.
 
-func ActiveElevators_to_CombinedHallRequests(ActiveElevators []ActiveElevator, CombinedHallRequests [elevio.N_Floors][2]bool) [elevio.N_Floors][2]bool {
+func ActiveElevators_to_HRAInput(ActiveElevatorsMap map[string]elevator.Elevator, CombinedHallRequests [elevio.N_Floors][2]bool) HRAInput {
 
-	for i := 0; i < len(ActiveElevators); i++ {
-		for floor := 0; floor < elevio.N_Floors; floor++ {
-			CombinedHallRequests[floor][0] = CombinedHallRequests[floor][0] || ActiveElevators[i].Elevator.Requests[floor][0]
-			CombinedHallRequests[floor][1] = CombinedHallRequests[floor][1] || ActiveElevators[i].Elevator.Requests[floor][1]
-		}
-	}
-	return CombinedHallRequests
-}
+	// ActiveElevatorMap := make(map[string]elevator.Elevator)
 
-func ActiveElevators_to_HRAInput(ActiveElevators []ActiveElevator, CombinedHallRequests [elevio.N_Floors][2]bool) HRAInput {
 	StateMap := make(map[string]HRAElevState)
-	for _, activeElevator := range ActiveElevators {
-		//StateMap[ActiveElevators[i].MyAddress] = ActiveElevatorsToHRAElevatorState(ActiveElevators[i])
-		StateMap[activeElevator.MyAddress] = ActiveElevatorsToHRAElevatorState(activeElevator)
+	for key, elevator := range ActiveElevatorsMap {
+		StateMap[key] = ElevatorToHRAElevatorState(elevator)
 	}
 
 	input := HRAInput{
@@ -93,12 +84,12 @@ func RequestsToCab(allRequests [elevio.N_Floors][elevio.N_Buttons]bool) []bool {
 	return CabRequests
 }
 
-func ActiveElevatorsToHRAElevatorState(ActiveElevator ActiveElevator) HRAElevState {
+func ElevatorToHRAElevatorState(Elevator elevator.Elevator) HRAElevState {
 	var ElevatorState HRAElevState
-	ElevatorState.Behavior = BehaviorToString(int(ActiveElevator.Elevator.Behaviour))
-	ElevatorState.Floor = ActiveElevator.Elevator.Floor
-	ElevatorState.Direction = DirnToString(int(ActiveElevator.Elevator.Dirn))
-	ElevatorState.CabRequests = RequestsToCab(ActiveElevator.Elevator.Requests)
+	ElevatorState.Behavior = BehaviorToString(int(Elevator.Behaviour))
+	ElevatorState.Floor = Elevator.Floor
+	ElevatorState.Direction = DirnToString(int(Elevator.Dirn))
+	ElevatorState.CabRequests = RequestsToCab(Elevator.Requests)
 	return ElevatorState
 }
 
@@ -118,7 +109,7 @@ func InitActiveElevator() ActiveElevator {
 	}
 }
 
-func HallRequestAssigner(ActiveElevators []ActiveElevator, CombinedHallRequests [elevio.N_Floors][2]bool) []ActiveElevator {
+func HallRequestAssigner(ActiveElevatorsMap map[string]elevator.Elevator, CombinedHallRequests [elevio.N_Floors][2]bool) map[string][elevio.N_Floors][2]bool {
 
 	hraExecutable := ""
 	switch runtime.GOOS {
@@ -130,7 +121,7 @@ func HallRequestAssigner(ActiveElevators []ActiveElevator, CombinedHallRequests 
 		panic("OS not supported")
 	}
 
-	input := ActiveElevators_to_HRAInput(ActiveElevators, CombinedHallRequests)
+	input := ActiveElevators_to_HRAInput(ActiveElevatorsMap, CombinedHallRequests)
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
@@ -145,32 +136,14 @@ func HallRequestAssigner(ActiveElevators []ActiveElevator, CombinedHallRequests 
 		//return "Error executing hall_request_assigner"
 	}
 
-	output := new(map[string][][2]bool)
+	output := new(map[string][elevio.N_Floors][2]bool)
 	err = json.Unmarshal(ret, &output)
 	if err != nil {
 		fmt.Println("json.Unmarshal error: ", err)
 		//return "Error parsing output from json"
 	}
 
-	outputString := "output: \n"
-	for k, v := range *output {
-		//fmt.Printf("%6v :  %+v\n", k, v)
-		outputString += fmt.Sprintf("%6v :  %+v\n", k, v)
-	}
-
-	return outputToNewActiveElevators(*output, ActiveElevators)
-}
-
-func outputToNewActiveElevators(output map[string][][2]bool, ActiveElevators []ActiveElevator) []ActiveElevator {
-	for i, activeElevator := range ActiveElevators {
-		hallRequests := output[activeElevator.MyAddress]
-		for floor := 0; floor < elevio.N_Floors; floor++ {
-			ActiveElevators[i].Elevator.Requests[floor][0] = hallRequests[floor][0]
-			ActiveElevators[i].Elevator.Requests[floor][1] = hallRequests[floor][1]
-			// ActiveElevators[i].Elevator.Requests[floor][3] = 0 // Question: Should we clear the cab requests here? - Answer depends on how hall_request_assigner.exe is coded. TODO: Check functionality by enabling/disabling this at later time when functioning elevators are acheived.
-		}
-	}
-	return ActiveElevators
+	return *output
 }
 
 func LocalIP() (string, error) {
