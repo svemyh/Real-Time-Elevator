@@ -127,16 +127,9 @@ func TCPListenForNewElevators(TCPPort string, isPrimary bool, clientUpdateCh cha
 			continue
 		}
 		var id string
-		localIP, err := LocalIP()
-			if err != nil {
-				fmt.Println(err)
-				localIP = "DISCONNECTED"
-			}
-		if isPrimary {
-			id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
-		} else if !isPrimary {
-			id = fmt.Sprintf("Client-%s-%d", localIP, os.Getpid())
-		}
+		remoteIP := RemoteIP(conn)
+	
+		id = fmt.Sprintf("%s-%d", remoteIP, os.Getpid())
 
 		go handleTCPConnection(conn, id, clientUpdateCh)
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
@@ -178,7 +171,6 @@ func handleTCPConnection(conn net.Conn, id string, clientUpdateCh chan<- ClientU
 		// Sending update
 		if updated {
 			c.Client = make([]string, 0, len(lastSeen))
-			fmt.Println(id+"\n")
 			c.Client = append(c.Client, id)
 			
 

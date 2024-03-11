@@ -18,3 +18,9 @@ func LocalIP() (string, error) {
 	}
 	return localIP, nil
 }
+
+func RemoteIP(conn net.Conn) string {
+    remoteAddr := conn.RemoteAddr().String()
+    ip := strings.Split(remoteAddr, ":")[0]
+    return ip
+}
