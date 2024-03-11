@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -101,7 +102,8 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 		message := string(buffer[:n])
 		if message == "OptimusPrime" {
 			log.Printf("Received %s from primary, remaining as client...", message)
-			return false, addr.String()
+			fmt.Println("AmIPrimary determines that primary's formatted address is: ", strings.Split(addr.String(), ":")[0])
+			return false, strings.Split(addr.String(), ":")[0]
 		}
 		// If received message is not "HelloWorld", keep listening until timeout
 	}
