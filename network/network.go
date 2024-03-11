@@ -105,7 +105,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		conn, _ := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
-		BackupRoutine(conn, primaryAddress)
+		BackupRoutine(conn, primaryAddress+DETECTION_PORT)
 	}
 }
 
@@ -122,7 +122,7 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 	}
 	defer ls.Close()
 
-	fmt.Println("Primary is listening for new primary connections to port:", TCPPort)
+	fmt.Println("-TCPListenForNewPrimary() listening for new primary connections to port:", TCPPort)
 	for {
 		conn, err := ls.Accept()
 		if err != nil {
@@ -141,12 +141,12 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 
 	ls, err := net.Listen("tcp", port)
 	if err != nil {
-		fmt.Println("The connection failed. Error:", err)
+		fmt.Println("TCPListenForBackupPromotion - The connection failed. Error:", err)
 		return nil, err
 	}
 	defer ls.Close()
 
-	fmt.Println("Primary is listening for new backup connections to port:", port)
+	fmt.Println("TCPListenForBackupPromotion -  listening for new backup connections to port:", port)
 	for {
 		conn, err := ls.Accept()
 		if err != nil {
@@ -174,7 +174,7 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 }
 
 func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) { // NOT TESTED!
-	fmt.Printf("*New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("RecieveAssignedHallRequests() - *New connection accepted from address: %s\n", conn.LocalAddr())
 
 	defer conn.Close()
 
@@ -201,8 +201,9 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 }
 
 func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
-	fmt.Println("Conection established to: ", conn.RemoteAddr())
+	fmt.Println("- sendLocalStatesToPrimaryLoop() - Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
+	
 
 	for {
 		select {
@@ -236,7 +237,7 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 
 			data, err := json.Marshal(my_ButtonEventMsg)
 			if err != nil {
-				fmt.Println("Error sending to Primary: ", err)
+				fmt.Println("Error encoding MsgButtonEvent to json: ", err)
 				return
 			}
 
@@ -284,7 +285,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	// type StateUpdateCh = IP + elevatorStates
 	// type HallOrderCopleteCh = floor number (of cab call completed)
 
-	fmt.Printf("*New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
 
 	defer conn.Close()
 

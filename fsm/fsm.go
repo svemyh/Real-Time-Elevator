@@ -150,6 +150,10 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 	if f := elevio.GetFloor(); f == -1 {
 		FsmOnInitBetweenFloors()
 	}
+	FSMStateUpdateCh <- hall_request_assigner.ActiveElevator{
+		Elevator:  elevatorState,
+		MyAddress: network.GetLocalIPv4(),
+	}
 
 	// Polling for new actions/events of the system.
 	for {

@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"elevator/conn"
 	"fmt"
 	"log"
 	"net"
@@ -21,32 +22,26 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 	fmt.Println("Im a backup, doing backup things")
 	PrimaryDeadCh := make(chan bool)
 	go CheckPrimaryAlive(primaryAddress, PrimaryDeadCh)
-
 }
 
 // Read "I'm the Primary" -message from the Primary(). If no message is recieved after N seconds,
 // then BackupRoutine() can assume Primary is dead -> Promote itself to Primary.
 func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
-	addr, err := net.ResolveUDPAddr("udp", primaryAddress)
-	if err != nil {
-		log.Printf("Error resolving UDP address: %v\n", err)
-		return
-	}
+	//addr, err := net.ResolveUDPAddr("udp", primaryAddress)
+	//if err != nil {
+	//	log.Printf("-CheckPrimaryAlive() Error resolving UDP address: %v\n", err)
+	//	return
+	//}
 
-	conn, err := net.ListenUDP("udp", addr) // Refactor: to not need the *net.UDPAddr object but a regular address
-	if err != nil {
-		log.Printf("Error listening on UDP: %v\n", err)
-		return
-	}
-	defer conn.Close()
+	conn := conn.DialBroadcastUDP(StringPortToInt(DETECTION_PORT))
 
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(udpInterval))
 	for {
 		buffer := make([]byte, bufSize)
-		n, _, err := conn.ReadFromUDP(buffer)
+		n, _, err := conn.ReadFrom(buffer)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				log.Printf("Timeout reached without receiving %s, becoming primary...", buffer[:n])
+				log.Printf("Timeout reached without receiving %s, backup is becoming primary...", buffer[:n])
 				PrimaryDeadCh <- true
 				return
 			}
@@ -56,8 +51,8 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 
 		message := string(buffer[:n])
 		if message == "OptimusPrime" {
-			log.Printf("Received %s from primary, remaining as client...", message)
-			conn.SetReadDeadline(time.Now().Add(5 * time.Second)) // Reset readDeadline
+			log.Printf("Received %s from primary, remaining as backup...", message)
+			conn.SetReadDeadline(time.Now().Add(udpInterval)) // Reset readDeadline
 		}
 		// If received message is not "OptimusPrime", keep listening until timeout
 	}

@@ -11,8 +11,8 @@ import (
 	"net"
 	"os"
 	"sort"
-	"strings"
 	"time"
+	"strings"
 )
 
 type Primary struct {
