@@ -80,7 +80,7 @@ func UDPBroadCastPrimaryRole(ctx context.Context, p string, transmitEnable <-cha
 
 		select {
 		case enable = <-transmitEnable:
-		case <-time.After(interval):
+		case <-time.After(interval/3):
 		}
 		if enable {
 			conn.WriteTo([]byte(key), addr)
@@ -162,7 +162,7 @@ func UDPBroadCastPrimaryRole(ctx context.Context, p string, transmitEnable <-cha
 	*/
 }
 
-const interval = 15 * time.Millisecond
+const interval = 2 * time.Second
 const timeout time.Duration = 500 * time.Millisecond // 500ms
 
 func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, string) { 
