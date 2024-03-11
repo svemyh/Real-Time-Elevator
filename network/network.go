@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"os"
 )
 
 var DETECTION_PORT string = ":10002"
@@ -22,6 +23,7 @@ type MessageType string
 const bufSize = 1024
 
 const udpInterval = 2 * time.Second
+const timeout = 500 * time.Millisecond
 
 const (
 	TypeActiveElevator MessageType = "ActiveElevator"
@@ -42,21 +44,65 @@ type MsgButtonEvent struct {
 
 type ClientUpdate struct {
 	Client []string
-	New   string
-	Lost  []string
+	New    string
+	Lost   []string
+}
+
+type ElevatorSystemChannels struct {
+	FSMStateUpdateCh          chan hall_request_assigner.ActiveElevator
+	FSMHallOrderCompleteCh    chan elevio.ButtonEvent
+	StateUpdateCh             chan hall_request_assigner.ActiveElevator
+	HallOrderCompleteCh       chan elevio.ButtonEvent
+	DisconnectedElevatorCh    chan string
+	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool
+	AssignHallRequestsMapCh   chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool
+}
+
+func NewElevatorSystemChannels() ElevatorSystemChannels {
+	return ElevatorSystemChannels{
+		FSMStateUpdateCh:          make(chan hall_request_assigner.ActiveElevator, 1024),
+		FSMHallOrderCompleteCh:    make(chan elevio.ButtonEvent, 1024),
+		StateUpdateCh:             make(chan hall_request_assigner.ActiveElevator, 1024),
+		HallOrderCompleteCh:       make(chan elevio.ButtonEvent, 1024),
+		DisconnectedElevatorCh:    make(chan string, 1024),
+		FSMAssignedHallRequestsCh: make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
+		AssignHallRequestsMapCh:   make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
+	}
 }
 
 // Alias: RunPrimaryBackup()
 func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
+	var id string
+
+	
+
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT, clientUpdateCh)
 	if isPrimary {
+		if id == "" {
+			localIP, err := LocalIP()
+			if err != nil {
+				fmt.Println(err)
+				localIP = "DISCONNECTED"
+			}
+			id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
+			fmt.Printf("My id: %s\n", id)
+		}
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh)
+		go PrimaryRoutine(id, isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
+		if id == "" {
+			localIP, err := LocalIP()
+			if err != nil {
+				fmt.Println(err)
+				localIP = "DISCONNECTED"
+			}
+			id = fmt.Sprintf("Client-%s-%d\n", localIP, os.Getpid())
+			fmt.Printf("My id: %s", id)
+		}
 		log.Println("Operating as client...")
 		go TCPDialPrimary(primaryAddress, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
@@ -220,7 +266,7 @@ func TCPWriteElevatorStates(conn net.Conn, AssignedHallRequestsCh chan map[strin
 			fmt.Println("Error encoding hallRequests to json: ", err)
 			return
 		}
-		
+
 		_, err = conn.Write(data)
 		if err != nil {
 			fmt.Println("Error sending HallRequests to: ", err)

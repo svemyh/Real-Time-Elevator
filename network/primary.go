@@ -6,10 +6,12 @@ import (
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
-	"log"
 	"fmt"
+	"log"
 	"net"
+	"sort"
 	"time"
+	"os"
 )
 
 type Primary struct {
@@ -21,8 +23,6 @@ type typeTaggedJSON struct {
 	TypeId string
 	JSON   []byte
 }
-
-
 
 /*
 func RunPrimaryBackup(necessarychannels...) {
@@ -107,11 +107,10 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	}
 }
 
-func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPListenForNewElevators(TCPPort string, isPrimary bool, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
 	//go TCPReadElevatorStates(stateUpdateCh)
-	var c ClientUpdate
 
 	ls, err := net.Listen("tcp", TCPPort)
 	if err != nil {
@@ -127,24 +126,94 @@ func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_as
 			fmt.Println("Error: ", err)
 			continue
 		}
-		// Adding new connection
-		c.New = ""
-		fmt.Printf("hello: %s", c.New)
+		var id string
+		localIP, err := LocalIP()
+			if err != nil {
+				fmt.Println(err)
+				localIP = "DISCONNECTED"
+			}
+		if isPrimary {
+			id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
+		} else if !isPrimary {
+			id = fmt.Sprintf("Client-%s-%d", localIP, os.Getpid())
+		}
+
+		go handleTCPConnection(conn, id, clientUpdateCh)
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
 		go TCPWriteElevatorStates(conn, AssignHallRequestsCh)
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func PrimaryRoutine(StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
+func handleTCPConnection(conn net.Conn, id string, clientUpdateCh chan<- ClientUpdate) {
+	defer conn.Close()
+
+	var c ClientUpdate
+	lastSeen := make(map[string]time.Time)
+
+	for {
+		updated := false
+
+		// Adding new connection
+		c.New = ""
+		if id != "" {
+			if _, idExists := lastSeen[id]; !idExists {
+				c.New = id
+				updated = true
+			}
+
+			lastSeen[id] = time.Now()
+		}
+
+		// Removing dead connection
+		c.Lost = make([]string, 0)
+		for k, v := range lastSeen {
+			if time.Now().Sub(v) > timeout {
+				updated = true
+				c.Lost = append(c.Lost, k)
+				delete(lastSeen, k)
+			}
+		}
+
+		// Sending update
+		if updated {
+			c.Client = make([]string, 0, len(lastSeen))
+			fmt.Println(id+"\n")
+			c.Client = append(c.Client, id)
+			
+
+			sort.Strings(c.Client)
+			sort.Strings(c.Lost)
+			clientUpdateCh <- c
+		}
+
+	}
+}
+func PrimaryRoutine(id string, isPrimary bool, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
 
-	peerTxEnable := make(chan bool)
-	go UDPBroadCastPrimaryRole(DETECTION_PORT, peerTxEnable)                                                                       //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
+	clientTxEnable := make(chan bool)
 	InitActiveElevators := make([]hall_request_assigner.ActiveElevator, 0)
+	clientUpdateCh := make(chan ClientUpdate)
+	helloRx := make(chan ElevatorSystemChannels)
+
+	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                     //Continously broadcast that you are a primary on UDP
+	go TCPListenForNewElevators(TCP_LISTEN_PORT, isPrimary, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(StateUpdateCh, HallOrderCompleteCh, InitActiveElevators, DisconnectedElevatorCh, AssignHallRequestsCh)
+
+	for {
+		select {
+		case c := <-clientUpdateCh:
+			fmt.Printf("Client update:\n")
+			fmt.Printf("  Clients:    %q\n", c.Client)
+			fmt.Printf("  New:      %q\n", c.New)
+			fmt.Printf("  Lost:     %q\n", c.Lost)
+
+		case a := <-helloRx:
+			fmt.Printf("Received: %#v\n", a)
+		}
+	}
 }
 
 // get new states everytime a local elevator updates their states.
@@ -292,4 +361,3 @@ func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
 	}
 	time.Sleep(50 * time.Millisecond)
 }
-

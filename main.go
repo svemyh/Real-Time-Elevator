@@ -3,39 +3,19 @@ package main
 import (
 	"elevator/elevio"
 	"elevator/fsm"
-	"elevator/hall_request_assigner"
+	//"elevator/hall_request_assigner"
 	"elevator/network"
 	"fmt"
 )
 
-type ElevatorSystemChannels struct {
-	FSMStateUpdateCh        		chan hall_request_assigner.ActiveElevator
-	FSMHallOrderCompleteCh  		chan elevio.ButtonEvent
-	StateUpdateCh           		chan hall_request_assigner.ActiveElevator
-	HallOrderCompleteCh     		chan elevio.ButtonEvent
-	DisconnectedElevatorCh  		chan string
-	FSMAssignedHallRequestsCh  		chan [elevio.N_Floors][elevio.N_Buttons - 1]bool
-	AssignHallRequestsMapCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool
-}
 
-func NewElevatorSystemChannels() ElevatorSystemChannels {
-	return ElevatorSystemChannels{
-		FSMStateUpdateCh:        	make(chan hall_request_assigner.ActiveElevator, 1024),
-		FSMHallOrderCompleteCh:  	make(chan elevio.ButtonEvent, 1024),
-		StateUpdateCh:           	make(chan hall_request_assigner.ActiveElevator, 1024),
-		HallOrderCompleteCh:     	make(chan elevio.ButtonEvent, 1024),
-		DisconnectedElevatorCh:  	make(chan string, 1024),
-		FSMAssignedHallRequestsCh:  make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
-		AssignHallRequestsMapCh: 	make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
-	}
-}
 
 func main() {
 	elevio.Init("localhost:15657", elevio.N_Floors)
 
 	fmt.Printf("Started!\n")
 
-	Channels := NewElevatorSystemChannels()
+	Channels := network.NewElevatorSystemChannels()
 
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int),
@@ -44,7 +24,7 @@ func main() {
 		ObstructionCh:   make(chan bool),
 	}
 
-	/* CLEANUP
+	/* CLEANUP. Moved to network
 	FSMStateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
 	FSMHallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
 	StateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
