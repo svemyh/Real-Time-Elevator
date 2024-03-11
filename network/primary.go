@@ -254,9 +254,10 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 
 				select { // Blocks until signal recieved on either of these
 				case <-AckCh:
+					fmt.Println("In case stateUpdate: ACK recieved ")
 					AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 				case <-time.After(5 * time.Second):
-					fmt.Println("Timeout occurred. No ACK received.")
+					fmt.Println("In case stateUpdate: Timeout occurred - No ACK received.")
 					// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
 				}
 			}
@@ -281,10 +282,10 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 			//DistributeHallButtonLights() //Distribute the button lights to each now that we have ack from each
 			//}
 
-		case CompletedOrder := <-HallOrderCompleteCh:
+		case completedOrder := <-HallOrderCompleteCh:
 			//TODO: clear order from some sort of global HALLREQ array
-			fmt.Println("\n---- Order completed at floor:", CompletedOrder)
-			CombinedHallRequests[CompletedOrder.Floor][CompletedOrder.Button] = false
+			fmt.Println("\n---- Order completed at floor:", completedOrder)
+			CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
 
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
@@ -293,9 +294,16 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 				}
-				TCPSendButtonEvent(backupConn, CompletedOrder) // Writing to Backup
+				TCPSendButtonEvent(backupConn, completedOrder) // Writing to Backup
 				// TODO: Wait for ACK
-				WaitForAcknowledgment(AckCh)
+				select { // Blocks until signal recieved on either of these
+				case <-AckCh:
+					// Do nothing
+					fmt.Println("In case completedOrder: ACK recieved ")
+				case <-time.After(5 * time.Second):
+					fmt.Println("In case completedOrder:  Timeout occurred - No ACK received.")
+					// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
+				}
 			}
 
 			//CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
@@ -378,7 +386,7 @@ func TCPSendACK(conn net.Conn) {
 		Type:    TypeActiveElevator,
 		Content: true,
 	}
-	fmt.Println("my_ACKMsg:", my_ACKMsg)
+	fmt.Println("TCPSendACK():", my_ACKMsg)
 	data, err := json.Marshal(my_ACKMsg)
 
 	if err != nil {

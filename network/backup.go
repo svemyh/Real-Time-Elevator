@@ -31,9 +31,9 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
 	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
 	BackupDisconnectedElevatorCh := make(chan string)
-	AckCh := make(chan bool) // Not used in backup's TCPReadElevatorStates()? -> Consider splitting the functions into one for primary and one for backup
+	BackupAckCh := make(chan bool) // Not used in backup's TCPReadElevatorStates()? -> Consider splitting the functions into one for primary and one for backup
 
-	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh, AckCh)
+	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh, BackupAckCh)
 
 	for {
 		select {
@@ -41,25 +41,19 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 			fmt.Println("BACKUP recieved stateUpdate: ", stateUpdate)
 			BackupActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
 			BackupCombinedHallRequests = UpdateCombinedHallRequests(BackupActiveElevatorMap, BackupCombinedHallRequests)
-			SendAckToPrimary(conn)
+			TCPSendACK(conn)
 
 		case completedOrder := <-BackupHallOrderCompleteCh:
 			fmt.Println("BACKUP recieved completedOrder: ", completedOrder)
 			BackupCombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
-			SendAckToPrimary(conn)
+			TCPSendACK(conn)
 
 		case disconnectedElevator := <-BackupDisconnectedElevatorCh:
 			fmt.Println("BACKUP recieved disconnectedElevator: ", disconnectedElevator)
 			delete(BackupActiveElevatorMap, disconnectedElevator)
-			SendAckToPrimary(conn)
+			TCPSendACK(conn)
 		}
 	}
-}
-
-func SendAckToPrimary(conn net.Conn) {
-	fmt.Println("Sending ACK to Primary. THis function returns when ack has been recieved.")
-	// TODO:
-	TCPSendACK(conn)
 }
 
 // Read "I'm the Primary" -message from the Primary(). If no message is recieved after N seconds,
