@@ -317,10 +317,32 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			delete(ActiveElevatorMap, disconnectedElevator)
+
 			// TODO: Implement TCPSendDisconnectedElevator(disconnectedElevator) // Backup also needs this information
 			// WaitForAcknowledgment(AckCh)
 
 			// TODO: if disconnectedElevator == backupElevator DO: initialize a new Backup
+			if len(ActiveElevatorMap) >= 2 {
+				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
+					// init a backup here:
+					fmt.Println("Backup does not exists yet. Initializing it..")
+					BackupAddr = GetBackupAddress(ActiveElevatorMap)
+					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
+					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
+				}
+
+				TCPSendString(backupConn, disconnectedElevator)
+				go func() { // wait for ACK
+					select { // Blocks until signal received on either of these
+					case <-AckCh:
+						fmt.Println("ACK received: In case stateUpdate")
+						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+					case <-time.After(5 * time.Second):
+						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
+						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
+					}
+				}()
+			}
 		}
 	}
 }
@@ -346,12 +368,12 @@ func GetBackupAddress(ActiveElevatorMap map[string]elevator.Elevator) string {
 
 func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.ActiveElevator) {
 	time.Sleep(50 * time.Millisecond)
-	my_ActiveElevatorMsg := MsgActiveElevator{
+	myActiveElevatorMsg := MsgActiveElevator{
 		Type:    TypeActiveElevator,
 		Content: activeElevator,
 	}
-	fmt.Println("my_ActiveElevatorMsg:", my_ActiveElevatorMsg)
-	data, err := json.Marshal(my_ActiveElevatorMsg)
+	fmt.Println("my_ActiveElevatorMsg:", myActiveElevatorMsg)
+	data, err := json.Marshal(myActiveElevatorMsg)
 
 	if err != nil {
 		fmt.Println("Error encoding ActiveElevator to json: ", err)
@@ -367,12 +389,12 @@ func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.A
 }
 
 func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
-	my_ButtonEventMsg := MsgButtonEvent{
+	myButtonEventMsg := MsgButtonEvent{
 		Type:    TypeButtonEvent,
 		Content: buttonEvent,
 	}
 
-	data, err := json.Marshal(my_ButtonEventMsg)
+	data, err := json.Marshal(myButtonEventMsg)
 	if err != nil {
 		fmt.Println("Error encoding ButtonEvent to json: ", err)
 		return
@@ -388,13 +410,13 @@ func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
 
 func TCPSendACK(conn net.Conn) {
 	time.Sleep(50 * time.Millisecond)
-	my_ACKMsg := MsgACK{
+	myACKMsg := MsgACK{
 		Type:    TypeACK,
 		Content: true,
 	}
 
-	fmt.Println("TCPSendACK():", my_ACKMsg)
-	data, err := json.Marshal(my_ACKMsg)
+	fmt.Println("TCPSendACK():", myACKMsg)
+	data, err := json.Marshal(myACKMsg)
 	if err != nil {
 		fmt.Println("Error encoding ACK to json: ", err)
 		return
@@ -403,6 +425,28 @@ func TCPSendACK(conn net.Conn) {
 	_, err = conn.Write(data)
 	if err != nil {
 		fmt.Println("Error sending ACK: ", err)
+		return
+	}
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TCPSendString(conn net.Conn, str string) {
+	time.Sleep(50 * time.Millisecond)
+	myStringMsg := MsgString{
+		Type:    TypeString,
+		Content: str,
+	}
+
+	fmt.Println("TCPSendString():", myStringMsg)
+	data, err := json.Marshal(myStringMsg)
+	if err != nil {
+		fmt.Println("Error encoding MsgString to json: ", err)
+		return
+	}
+
+	_, err = conn.Write(data)
+	if err != nil {
+		fmt.Println("Error sending MsgString: ", err)
 		return
 	}
 	time.Sleep(50 * time.Millisecond)

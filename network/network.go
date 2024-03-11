@@ -29,6 +29,7 @@ const (
 	TypeActiveElevator MessageType = "ActiveElevator"
 	TypeButtonEvent    MessageType = "ButtonEvent"
 	TypeACK            MessageType = "ACK"
+	TypeString         MessageType = "string"
 )
 
 type Message interface{}
@@ -46,6 +47,11 @@ type MsgButtonEvent struct {
 type MsgACK struct {
 	Type    MessageType `json:"type"`
 	Content bool        "json:content"
+}
+
+type MsgString struct {
+	Type    MessageType `json:"type"`
+	Content string      "json:content"
 }
 
 type ClientUpdate struct {
@@ -302,7 +308,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
-			DisconnectedElevatorCh <- conn.LocalAddr().String()
+			DisconnectedElevatorCh <- conn.LocalAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
 			log.Fatal(err)
 		}
 
@@ -329,6 +335,13 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			}
 			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
 			HallOrderCompleteCh <- msg.Content
+		case TypeString:
+			var msg MsgString
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Received string object: %+v\n", msg)
+			DisconnectedElevatorCh <- msg.Content
 
 		default:
 			fmt.Println("Unknown message type")
