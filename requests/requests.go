@@ -136,6 +136,8 @@ func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio
 				e.Requests[e.Floor][elevio.B_HallDown] = false
 				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 			}
+			e.Requests[e.Floor][elevio.B_HallUp] = false
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
 		case elevio.D_Down:
 			if !RequestsBelow(e) && !e.Requests[e.Floor][elevio.B_HallDown] {
 				e.Requests[e.Floor][elevio.B_HallUp] = false
@@ -144,7 +146,7 @@ func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio
 			e.Requests[e.Floor][elevio.B_HallDown] = false
 			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 		case elevio.D_Stop:
-			break
+			fallthrough
 		default:
 			e.Requests[e.Floor][elevio.B_HallUp] = false
 			e.Requests[e.Floor][elevio.B_HallDown] = false
@@ -155,3 +157,4 @@ func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio
 
 	return e
 }
+
