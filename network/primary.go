@@ -109,7 +109,7 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	}
 }
 
-func TCPListenForNewElevators(TCPPort string, isPrimary bool, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) {
+func TCPListenForNewElevators(TCPPort string, isPrimary bool, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
 	//go TCPReadElevatorStates(stateUpdateCh)
@@ -134,7 +134,7 @@ func TCPListenForNewElevators(TCPPort string, isPrimary bool, clientUpdateCh cha
 		id = fmt.Sprintf("%s-%d", remoteIP, os.Getpid())
 
 		go handleTCPConnection(conn, id, clientUpdateCh)
-		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AckCh)
+		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
 		go TCPWriteElevatorStates(conn, AssignHallRequestsCh)
 		time.Sleep(1 * time.Second)
 	}
@@ -191,8 +191,8 @@ func PrimaryRoutine(id string, isPrimary bool, StateUpdateCh chan hall_request_a
 	clientUpdateCh := make(chan ClientUpdate)
 	helloRx := make(chan ElevatorSystemChannels)
 
-	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                                       //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT, isPrimary, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh) //Continously listen if new elevator entring networks is trying to establish connection
+	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                                //Continously broadcast that you are a primary on UDP
+	go TCPListenForNewElevators(TCP_LISTEN_PORT, isPrimary, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(StateUpdateCh, HallOrderCompleteCh, InitActiveElevators, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 
 	for {
@@ -247,6 +247,7 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 					fmt.Println("Backup does not exists yet. Initializing it..")
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
+					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
 				}
 				TCPSendActiveElevator(backupConn, stateUpdate) // TODO: Needs to be updated to TCPSendActiveElevatorWithAck() which blocks until ack recieved.
 				//This function is only for the backup/primary-communication.
@@ -255,10 +256,10 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 				go func() {
 					select { // Blocks until signal received on either of these
 					case <-AckCh:
-						fmt.Println("In case stateUpdate: ACK received")
+						fmt.Println("ACK received: In case stateUpdate")
 						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
-						fmt.Println("In case stateUpdate: Timeout occurred - No ACK received.")
+						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
 					}
 				}()
@@ -295,6 +296,7 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 					fmt.Println("Backup does not exists yet. Initializing it..")
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
+					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
 				}
 				TCPSendButtonEvent(backupConn, completedOrder) // Writing to Backup
 				// TODO: Wait for ACK
@@ -302,9 +304,9 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 					select { // Blocks until signal recieved on either of these
 					case <-AckCh:
 						// Do nothing
-						fmt.Println("In case completedOrder: ACK recieved ")
+						fmt.Println("ACK received: In case completedOrder")
 					case <-time.After(5 * time.Second):
-						fmt.Println("In case completedOrder:  Timeout occurred - No ACK received.")
+						fmt.Println("No ACK recieved - Timeout occurred. In case completedOrder")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
 					}
 				}()
@@ -387,21 +389,65 @@ func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
 func TCPSendACK(conn net.Conn) {
 	time.Sleep(50 * time.Millisecond)
 	my_ACKMsg := MsgACK{
-		Type:    TypeActiveElevator,
+		Type:    TypeACK,
 		Content: true,
 	}
+
 	fmt.Println("TCPSendACK():", my_ACKMsg)
 	data, err := json.Marshal(my_ACKMsg)
-
 	if err != nil {
-		fmt.Println("Error encoding ActiveElevator to json: ", err)
+		fmt.Println("Error encoding ACK to json: ", err)
 		return
 	}
 
 	_, err = conn.Write(data)
 	if err != nil {
-		fmt.Println("Error sending ActiveElevator: ", err)
+		fmt.Println("Error sending ACK: ", err)
 		return
 	}
 	time.Sleep(50 * time.Millisecond)
+}
+
+// Alias: Server()
+func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bool) {
+	//TODO:Read the states and store in a buffer
+	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
+	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
+	// Can be added/expanded: LocalErrorDetectedCh or similar
+	// type StateUpdateCh = IP + elevatorStates
+	// type HallOrderCopleteCh = floor number (of cab call completed)
+
+	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
+
+	defer conn.Close()
+
+	for {
+		// Create buffer and read data into the buffer using conn.Read()
+		var buf [bufSize]byte
+		n, err := conn.Read(buf[:])
+		if err != nil {
+			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
+			DisconnectedElevatorCh <- conn.LocalAddr().String()
+			log.Fatal(err)
+		}
+
+		// Decoding said data into a json-style object
+		var genericMsg map[string]interface{}
+		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
+			fmt.Println("Error unmarshaling generic message: ", err)
+			log.Fatal(err)
+		}
+		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
+		switch MessageType(genericMsg["type"].(string)) {
+		case TypeACK:
+			var msg MsgACK
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				log.Fatal(err)
+			}
+			AckCh <- msg.Content
+
+		default:
+			fmt.Println("Unknown message type")
+		}
+	}
 }

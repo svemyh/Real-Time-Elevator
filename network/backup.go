@@ -31,9 +31,8 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
 	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
 	BackupDisconnectedElevatorCh := make(chan string)
-	BackupAckCh := make(chan bool) // Not used in backup's TCPReadElevatorStates()? -> Consider splitting the functions into one for primary and one for backup
 
-	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh, BackupAckCh)
+	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh)
 
 	for {
 		select {
