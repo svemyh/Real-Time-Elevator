@@ -22,10 +22,7 @@ type typeTaggedJSON struct {
 	JSON   []byte
 }
 
-const bufSize = 1024
 
-const interval = 2 * time.Second
-const timeout time.Duration = 500 * time.Millisecond // 500ms
 
 /*
 func RunPrimaryBackup(necessarychannels...) {
@@ -74,7 +71,7 @@ func UDPBroadCastPrimaryRole(p string, transmitEnable <-chan bool) {
 
 		select {
 		case enable = <-transmitEnable:
-		case <-time.After(interval / 4):
+		case <-time.After(udpInterval / 4):
 		}
 		if enable {
 			conn.WriteTo([]byte(key), addr)
@@ -86,10 +83,10 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	port := StringPortToInt(addressString)
 
 	conn := conn.DialBroadcastUDP(port)
-	conn.SetReadDeadline(time.Now().Add(interval))
+	conn.SetReadDeadline(time.Now().Add(udpInterval))
 
 	for {
-		buffer := make([]byte, 1024)
+		buffer := make([]byte, bufSize)
 		n, addr, err := conn.ReadFrom(buffer)
 
 		if err != nil {
@@ -120,6 +117,8 @@ func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_as
 		return
 	}
 	defer ls.Close()
+
+	lastSeen := make(map[string]time.Time)
 
 	fmt.Println("Primary is listening for new connections to port:", TCPPort)
 	for {

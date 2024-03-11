@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"elevator/elevio"
 	"elevator/fsm"
 	"elevator/hall_request_assigner"
@@ -10,23 +9,23 @@ import (
 )
 
 type ElevatorSystemChannels struct {
-	FSMStateUpdateCh            	chan hall_request_assigner.ActiveElevator
-	FSMHallOrderCompleteCh      	chan elevio.ButtonEvent
-	StateUpdateCh					chan hall_request_assigner.ActiveElevator
-	HallOrderCompleteCh				chan elevio.ButtonEvent
-	DisconnectedElevatorCh  	 	chan string
-	AssignedHallRequestsCh	   		chan [elevio.N_Floors][elevio.N_Buttons - 1]bool
-	AssignHallRequestsMapCh  		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool
+	FSMStateUpdateCh        		chan hall_request_assigner.ActiveElevator
+	FSMHallOrderCompleteCh  		chan elevio.ButtonEvent
+	StateUpdateCh           		chan hall_request_assigner.ActiveElevator
+	HallOrderCompleteCh     		chan elevio.ButtonEvent
+	DisconnectedElevatorCh  		chan string
+	FSMAssignedHallRequestsCh  		chan [elevio.N_Floors][elevio.N_Buttons - 1]bool
+	AssignHallRequestsMapCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool
 }
 
 func NewElevatorSystemChannels() ElevatorSystemChannels {
 	return ElevatorSystemChannels{
-		FSMStateUpdateCh:           make(chan hall_request_assigner.ActiveElevator, 1024),
-		FSMHallOrderCompleteCh:     make(chan elevio.ButtonEvent, 1024),
-		StateUpdateCh:				make(chan hall_request_assigner.ActiveElevator, 1024),
-		HallOrderCompleteCh:		make(chan elevio.ButtonEvent, 1024),
-		DisconnectedElevatorCh:   	make(chan string, 1024),
-		AssignedHallRequestsCh:   	make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
+		FSMStateUpdateCh:        	make(chan hall_request_assigner.ActiveElevator, 1024),
+		FSMHallOrderCompleteCh:  	make(chan elevio.ButtonEvent, 1024),
+		StateUpdateCh:           	make(chan hall_request_assigner.ActiveElevator, 1024),
+		HallOrderCompleteCh:     	make(chan elevio.ButtonEvent, 1024),
+		DisconnectedElevatorCh:  	make(chan string, 1024),
+		FSMAssignedHallRequestsCh:  make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
 		AssignHallRequestsMapCh: 	make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
 	}
 }
@@ -36,13 +35,15 @@ func main() {
 
 	fmt.Printf("Started!\n")
 
+	Channels := NewElevatorSystemChannels()
+
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int),
 		RequestButtonCh: make(chan elevio.ButtonEvent),
 		StopButtonCh:    make(chan bool),
 		ObstructionCh:   make(chan bool),
 	}
-	
+
 	/* CLEANUP
 	FSMStateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
 	FSMHallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
@@ -59,12 +60,9 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh) // Alias: RunPrimaryBackup()
 
-	go network.InitNetwork(ctx, FSMStateUpdateCh, FSMHallOrderCompleteCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, FSMAssignedHallRequestsCh, AssignHallRequestsCh) // Alias: RunPrimaryBackup()
-
-	go fsm.FsmRun(device, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
+	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
 	go network.RestartOnReconnect()
 

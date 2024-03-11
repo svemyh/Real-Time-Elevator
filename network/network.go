@@ -1,7 +1,6 @@
 package network
 
 import (
-	"context"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
@@ -19,6 +18,10 @@ var TCP_LISTEN_PORT string = ":10001"
 var TCP_BACKUP_PORT string = ":15000"
 
 type MessageType string
+
+const bufSize = 1024
+
+const udpInterval = 2 * time.Second
 
 const (
 	TypeActiveElevator MessageType = "ActiveElevator"
@@ -44,7 +47,7 @@ type ClientUpdate struct {
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(ctx context.Context, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT, clientUpdateCh)
@@ -82,6 +85,7 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 			fmt.Println("Error: ", err)
 			continue
 		}
+
 		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
 		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
 	}
@@ -131,7 +135,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 	defer conn.Close()
 
 	for {
-		var buf [1024]byte
+		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> TODO: Do something
@@ -236,14 +240,14 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	// type StateUpdateCh = IP + elevatorStates
 	// type HallOrderCopleteCh = floor number (of cab call completed)
 
-	fmt.Printf("*New connection accepted from adress: %s\n", conn.LocalAddr())
+	fmt.Printf("*New connection accepted from address: %s\n", conn.LocalAddr())
 
 	defer conn.Close()
 
 	for {
 		fmt.Printf("STILL IN READING LOOP PRIMARY SIDE")
 		// Create buffer and read data into the buffer using conn.Read()
-		var buf [1024]byte
+		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.

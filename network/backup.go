@@ -42,7 +42,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	for {
-		buffer := make([]byte, 1024)
+		buffer := make([]byte, bufSize)
 		n, _, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
