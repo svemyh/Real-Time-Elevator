@@ -3,6 +3,9 @@ package network
 import (
 	"context"
 	"elevator/conn"
+	"elevator/elevator"
+	"elevator/elevio"
+	"elevator/hall_request_assigner"
 	"fmt"
 	"log"
 	"net"
@@ -15,13 +18,48 @@ type Backup struct {
 }
 
 func BackupRoutine(conn net.Conn, primaryAddress string) {
+	BackupActiveElevatorMap := make(map[string]elevator.Elevator)
+	var BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 
 	//TODO: Monitor that primary connection is alive
 	//TODO: Read states sendt through primary connection (make an array to contain -> activeElevators)
-	//TODO: If backup unresponsive --> BecomePrimary(activeElevators)
+	//TODO: If backup unresponsive --> BecomePrimary(activeElevators). TODO: INIT A BACKUP IN BecomePrimary()
 	fmt.Println("Im a backup, doing backup things")
 	PrimaryDeadCh := make(chan bool)
 	go CheckPrimaryAlive(primaryAddress, PrimaryDeadCh)
+
+	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
+	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
+	BackupDisconnectedElevatorCh := make(chan string)
+	AckCh := make(chan bool) // Not used in backup's TCPReadElevatorStates()? -> Consider splitting the functions into one for primary and one for backup
+
+	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh, AckCh)
+
+	for {
+		select {
+		case stateUpdate := <-BackupStateUpdateCh:
+			fmt.Println("BACKUP recieved stateUpdate: ", stateUpdate)
+			BackupActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
+			BackupCombinedHallRequests = UpdateCombinedHallRequests(BackupActiveElevatorMap, BackupCombinedHallRequests)
+			SendAckToPrimary(conn)
+
+		case completedOrder := <-BackupHallOrderCompleteCh:
+			fmt.Println("BACKUP recieved completedOrder: ", completedOrder)
+			BackupCombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
+			SendAckToPrimary(conn)
+
+		case disconnectedElevator := <-BackupDisconnectedElevatorCh:
+			fmt.Println("BACKUP recieved disconnectedElevator: ", disconnectedElevator)
+			delete(BackupActiveElevatorMap, disconnectedElevator)
+			SendAckToPrimary(conn)
+		}
+	}
+}
+
+func SendAckToPrimary(conn net.Conn) {
+	fmt.Println("Sending ACK to Primary. THis function returns when ack has been recieved.")
+	// TODO:
+	TCPSendACK(conn)
 }
 
 // Read "I'm the Primary" -message from the Primary(). If no message is recieved after N seconds,
@@ -55,6 +93,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 			conn.SetReadDeadline(time.Now().Add(udpInterval)) // Reset readDeadline
 		}
 		// If received message is not "OptimusPrime", keep listening until timeout
+		//At timeout become a primary
 	}
 }
 

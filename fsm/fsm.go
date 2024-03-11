@@ -150,7 +150,8 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 	if f := elevio.GetFloor(); f == -1 {
 		FsmOnInitBetweenFloors()
 	}
-	FSMStateUpdateCh <- hall_request_assigner.ActiveElevator{
+	FSMStateUpdateCh <- hall_request_assigner.ActiveElevator{ // Is this the cause of the error "core.exception.AssertError@optimal_hall_requests.d(27): Some elevator is at an invalid floor
+		// i.e. hall_request_assigner.exe does not allow for inputs where an elevator is in the floor "-1"/undefined
 		Elevator:  elevatorState,
 		MyAddress: network.GetLocalIPv4(),
 	}

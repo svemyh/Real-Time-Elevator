@@ -28,6 +28,7 @@ const timeout = 500 * time.Millisecond
 const (
 	TypeActiveElevator MessageType = "ActiveElevator"
 	TypeButtonEvent    MessageType = "ButtonEvent"
+	TypeACK            MessageType = "ACK"
 )
 
 type Message interface{}
@@ -39,7 +40,12 @@ type MsgActiveElevator struct {
 
 type MsgButtonEvent struct {
 	Type    MessageType        `json:"type"`
-	Content elevio.ButtonEvent "json:content"
+	Content elevio.ButtonEvent "json:content" // refactor: change Content to antother name? Then go compiler stops complaining
+}
+
+type MsgACK struct {
+	Type    MessageType `json:"type"`
+	Content bool        "json:content"
 }
 
 type ClientUpdate struct {
@@ -56,6 +62,7 @@ type ElevatorSystemChannels struct {
 	DisconnectedElevatorCh    chan string
 	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool
 	AssignHallRequestsMapCh   chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool
+	AckCh                     chan bool
 }
 
 func NewElevatorSystemChannels() ElevatorSystemChannels {
@@ -67,11 +74,12 @@ func NewElevatorSystemChannels() ElevatorSystemChannels {
 		DisconnectedElevatorCh:    make(chan string, 1024),
 		FSMAssignedHallRequestsCh: make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
 		AssignHallRequestsMapCh:   make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
+		AckCh:                     make(chan bool, 64),
 	}
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) {
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
 	var id string
@@ -88,7 +96,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 			fmt.Printf("My id: %s\n", id)
 		}
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(id, isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh)
+		go PrimaryRoutine(id, isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
@@ -203,7 +211,6 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	fmt.Println("- sendLocalStatesToPrimaryLoop() - Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
-	
 
 	for {
 		select {
@@ -277,7 +284,7 @@ func TCPWriteElevatorStates(conn net.Conn, AssignedHallRequestsCh chan map[strin
 }
 
 // Alias: Server()
-func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string) {
+func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AckCh chan bool) {
 	//TODO:Read the states and store in a buffer
 	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
@@ -322,6 +329,14 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			}
 			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
 			HallOrderCompleteCh <- msg.Content
+
+		case TypeACK:
+			var msg MsgACK
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
+			AckCh <- msg.Content
 
 		default:
 			fmt.Println("Unknown message type")
