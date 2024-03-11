@@ -3,7 +3,6 @@ package requests
 import (
 	"elevator/elevator"
 	"elevator/elevio"
-	"fmt"
 	//"elevator/fsm"
 )
 
@@ -41,11 +40,6 @@ func RequestsHere(e elevator.Elevator) bool {
 }
 
 func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehaviour) { // Elevator doesn't have a motorDirection, but it does have a Dirn
-	// Temporary debug output to understand the state of requests
-	fmt.Println("Requests Above:", RequestsAbove(e))
-	fmt.Println("Requests Here:", RequestsHere(e))
-	fmt.Println("Requests Below:", RequestsBelow(e))
-
 	if RequestsAbove(e) {
 		e.Dirn = elevio.D_Up
 	} else if RequestsBelow(e) {
@@ -53,41 +47,29 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
 	} else if RequestsHere(e) {
 		e.Dirn = elevio.D_Stop
 	}
-	fmt.Println("e.Dirn", e.Dirn)
 	switch e.Dirn {
 	case elevio.D_Up:
-		println("Case up")
 		if RequestsAbove(e) {
-			println("Request up")
 			return elevio.D_Up, elevator.EB_Moving
 		} else if RequestsHere(e) {
-			println("Request here")
 			return elevio.D_Down, elevator.EB_DoorOpen
 		} else if RequestsBelow(e) {
-			println("Request below")
 			return elevio.D_Down, elevator.EB_Moving
 		}
 	case elevio.D_Down:
-		println("Case down")
 		if RequestsBelow(e) {
-			println("Request below")
 			return elevio.D_Down, elevator.EB_Moving
 		} else if RequestsHere(e) {
-			println("Request here")
 			return elevio.D_Up, elevator.EB_DoorOpen
 		} else if RequestsAbove(e) {
-			println("Request up")
 			return elevio.D_Up, elevator.EB_Moving
 		}
 	case elevio.D_Stop:
-		println("Case stop")
 		if RequestsHere(e) {
-			println("Request here")
 			return elevio.D_Up, elevator.EB_DoorOpen
 		}
 
 	}
-	println("Request stop")
 	return elevio.D_Stop, elevator.EB_Idle
 }
 
@@ -154,6 +136,5 @@ func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio
 			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 		}
 	}
-
 	return e
 }

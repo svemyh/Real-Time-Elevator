@@ -15,7 +15,7 @@ import (
 // var outputDevice elevio.ElevOutputDevice // Not necessary on Go only in C?
 
 var elevatorState elevator.Elevator
-var outputDevice elevio.ElevOutputDevice
+var outputDevice elevio.ElevOutputDevice // Is this used anywhere?
 
 func init() {
 	// Initialize the elevator state.
@@ -112,7 +112,7 @@ func FsmOnFloorArrival(newFloor int, FSMHallOrderCompleteCh chan elevio.ButtonEv
 }
 
 func FsmOnDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
-	fmt.Println("\nDoor timeout")
+	//fmt.Println("\nDoor timeout")
 
 	switch elevatorState.Behaviour {
 	case elevator.EB_DoorOpen:
@@ -188,11 +188,13 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 			// TODO: Implement later
 
 		case AssignedHallRequests := <-FSMAssignedHallRequestsCh:
+
 			for i := 0; i < elevio.N_Floors; i++ {
 				for j := 0; j < 2; j++ {
+					elevatorState.Requests[i][j] = false
 					if AssignedHallRequests[i][j] {
 						FsmOnRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh)
-						time.Sleep(50 * time.Millisecond)
+						time.Sleep(5 * time.Millisecond)
 					}
 				}
 			}

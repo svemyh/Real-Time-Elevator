@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
-	"os"
 )
 
 var DETECTION_PORT string = ":10002"
@@ -75,8 +75,6 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
 	var id string
-
-	
 
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT, clientUpdateCh)
 	if isPrimary {
@@ -291,7 +289,6 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	defer conn.Close()
 
 	for {
-		fmt.Printf("STILL IN READING LOOP PRIMARY SIDE")
 		// Create buffer and read data into the buffer using conn.Read()
 		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
@@ -332,15 +329,15 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 }
 
 func TCPDialBackup(address string, port string) net.Conn {
-	fmt.Println("Connecting by TCP to the address: ", address)
+	fmt.Println("TCPDialBackup() - Connecting by TCP to the address: ", address+port)
 
-	conn, err := net.Dial("tcp", address)
+	conn, err := net.Dial("tcp", address+port)
 	if err != nil {
-		fmt.Println("Connection failed. Error: ", err)
+		fmt.Println("Error in TCPDialBackup() - Connection failed. Error: ", err)
 		return nil
 	}
 
-	fmt.Println("Conection established to: ", conn.RemoteAddr())
+	fmt.Println("TCPDialBackup() - Conection established to: ", conn.RemoteAddr())
 	return conn
 }
 
