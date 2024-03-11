@@ -220,7 +220,7 @@ func TCPWriteElevatorStates(conn net.Conn, AssignedHallRequestsCh chan map[strin
 			fmt.Println("Error encoding hallRequests to json: ", err)
 			return
 		}
-
+		
 		_, err = conn.Write(data)
 		if err != nil {
 			fmt.Println("Error sending HallRequests to: ", err)

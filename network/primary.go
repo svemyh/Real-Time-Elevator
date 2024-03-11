@@ -111,14 +111,14 @@ func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_as
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
 	//go TCPReadElevatorStates(stateUpdateCh)
+	var c ClientUpdate
+
 	ls, err := net.Listen("tcp", TCPPort)
 	if err != nil {
 		fmt.Println("The connection failed. Error:", err)
 		return
 	}
 	defer ls.Close()
-
-	lastSeen := make(map[string]time.Time)
 
 	fmt.Println("Primary is listening for new connections to port:", TCPPort)
 	for {
@@ -127,7 +127,9 @@ func TCPListenForNewElevators(TCPPort string, StateUpdateCh chan hall_request_as
 			fmt.Println("Error: ", err)
 			continue
 		}
-
+		// Adding new connection
+		c.New = ""
+		fmt.Printf("hello: %s", c.New)
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
 		go TCPWriteElevatorStates(conn, AssignHallRequestsCh)
 		time.Sleep(1 * time.Second)
