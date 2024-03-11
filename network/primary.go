@@ -252,14 +252,16 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 				//This function is only for the backup/primary-communication.
 				CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
 
-				select { // Blocks until signal recieved on either of these
-				case <-AckCh:
-					fmt.Println("In case stateUpdate: ACK recieved ")
-					AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
-				case <-time.After(5 * time.Second):
-					fmt.Println("In case stateUpdate: Timeout occurred - No ACK received.")
-					// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
-				}
+				go func() {
+					select { // Blocks until signal received on either of these
+					case <-AckCh:
+						fmt.Println("In case stateUpdate: ACK received")
+						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+					case <-time.After(5 * time.Second):
+						fmt.Println("In case stateUpdate: Timeout occurred - No ACK received.")
+						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
+					}
+				}()
 			}
 
 			// For test purposes
@@ -296,14 +298,16 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 				}
 				TCPSendButtonEvent(backupConn, completedOrder) // Writing to Backup
 				// TODO: Wait for ACK
-				select { // Blocks until signal recieved on either of these
-				case <-AckCh:
-					// Do nothing
-					fmt.Println("In case completedOrder: ACK recieved ")
-				case <-time.After(5 * time.Second):
-					fmt.Println("In case completedOrder:  Timeout occurred - No ACK received.")
-					// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
-				}
+				go func() {
+					select { // Blocks until signal recieved on either of these
+					case <-AckCh:
+						// Do nothing
+						fmt.Println("In case completedOrder: ACK recieved ")
+					case <-time.After(5 * time.Second):
+						fmt.Println("In case completedOrder:  Timeout occurred - No ACK received.")
+						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
+					}
+				}()
 			}
 
 			//CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)

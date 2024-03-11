@@ -335,7 +335,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
 				log.Fatal(err)
 			}
-			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
+			fmt.Printf("Received ACK object: %+v\n", msg)
 			AckCh <- msg.Content
 
 		default:
