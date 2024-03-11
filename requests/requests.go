@@ -157,4 +157,3 @@ func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio
 
 	return e
 }
-

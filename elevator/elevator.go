@@ -38,7 +38,7 @@ func ElevatorInit() Elevator {
 		Dirn:      elevio.D_Stop,
 		Behaviour: EB_Idle,
 		Config: Config{
-			ClearRequestVariant: CV_All,
+			ClearRequestVariant: CV_InDoorn,
 			DoorOpenDurationS:   3.0,
 		},
 	}

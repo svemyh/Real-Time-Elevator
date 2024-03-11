@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sort"
 	"time"
-	"os"
 )
 
 type Primary struct {
@@ -128,7 +128,7 @@ func TCPListenForNewElevators(TCPPort string, isPrimary bool, clientUpdateCh cha
 		}
 		var id string
 		remoteIP := RemoteIP(conn)
-	
+
 		id = fmt.Sprintf("%s-%d", remoteIP, os.Getpid())
 
 		go handleTCPConnection(conn, id, clientUpdateCh)
@@ -172,7 +172,6 @@ func handleTCPConnection(conn net.Conn, id string, clientUpdateCh chan<- ClientU
 		if updated {
 			c.Client = make([]string, 0, len(lastSeen))
 			c.Client = append(c.Client, id)
-			
 
 			sort.Strings(c.Client)
 			sort.Strings(c.Lost)
@@ -190,7 +189,7 @@ func PrimaryRoutine(id string, isPrimary bool, StateUpdateCh chan hall_request_a
 	clientUpdateCh := make(chan ClientUpdate)
 	helloRx := make(chan ElevatorSystemChannels)
 
-	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                     //Continously broadcast that you are a primary on UDP
+	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                                //Continously broadcast that you are a primary on UDP
 	go TCPListenForNewElevators(TCP_LISTEN_PORT, isPrimary, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(StateUpdateCh, HallOrderCompleteCh, InitActiveElevators, DisconnectedElevatorCh, AssignHallRequestsCh)
 
@@ -293,8 +292,8 @@ func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator,
 				fmt.Println("Break2")
 			}
 
-			CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
-			AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+			//CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
+			//ssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			delete(ActiveElevatorMap, disconnectedElevator)
