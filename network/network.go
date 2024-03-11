@@ -1,14 +1,16 @@
 package network
 
 import (
-	"context"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -18,9 +20,16 @@ var TCP_BACKUP_PORT string = ":15000"
 
 type MessageType string
 
+const bufSize = 1024
+
+const udpInterval = 2 * time.Second
+const timeout = 500 * time.Millisecond
+
 const (
 	TypeActiveElevator MessageType = "ActiveElevator"
 	TypeButtonEvent    MessageType = "ButtonEvent"
+	TypeACK            MessageType = "ACK"
+	TypeString         MessageType = "string"
 )
 
 type Message interface{}
@@ -32,134 +41,85 @@ type MsgActiveElevator struct {
 
 type MsgButtonEvent struct {
 	Type    MessageType        `json:"type"`
-	Content elevio.ButtonEvent "json:content"
+	Content elevio.ButtonEvent "json:content" // refactor: change Content to antother name? Then go compiler stops complaining
 }
 
-/*
-type RXChannels struct {
-	StateUpdateCh       chan types.ElevState      `addr:"stateupdatech"`
-	RegisterOrderCh     chan types.OrderEvent     `addr:"registerorderch"`
-	OrdersFromMasterCh  chan types.GlobalOrderMap `addr:"ordersfrommasterch"`
-	OrderCopyRequestCh  chan bool                 `addr:"ordercopyrequestch"`
-	OrderCopyResponseCh chan types.GlobalOrderMap `addr:"ordercopyresponsech"`
-}
-*/
-
-func InitReceiver(ctx context.Context, receiver chan<- string, addressString string) string {
-	addr, err := net.ResolveUDPAddr("udp", addressString) //addressString to actual address(server/)
-	if err != nil {
-		fmt.Println("Error resolving UDP address:", err)
-	}
-
-	// TODO: recvSock = new Socket(udp). Bind address we want to use to the socket
-	recvSock, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		fmt.Println("Error listening:", err)
-	}
-	defer recvSock.Close() // Close recvSock AFTER surrounding main function completes
-
-	//buffer := make([]byte, 1024) // a buffer where the received network data is stored byte[1024] buffer
-
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		default:
-			recvSock.SetReadDeadline(time.Now().Add(3 * time.Second))
-			buffer := make([]byte, 1024)
-
-			numBytesReceived, fromWho, err := recvSock.ReadFromUDP(buffer)
-			if err != nil {
-				fmt.Println("Error readFromUDP:", err)
-				break
-			}
-			message := string(buffer[:numBytesReceived])
-
-			localIP, err := net.ResolveUDPAddr("udp", addressString) // localIP
-			if err != nil {
-				fmt.Println("Error resolving UDP address:", err)
-				break
-			}
-
-			if string(fromWho.IP) != string(localIP.IP) {
-				fmt.Printf("Received: %s\n", message)
-				//fmt.PrintIn("Filtered out: ", string(buffer[0:numBytesReceived]))
-				//receiver <- messageInitStateByBroadcastingNetworkAndWait()
-				return message
-			}
-		}
-	}
+type MsgACK struct {
+	Type    MessageType `json:"type"`
+	Content bool        "json:content"
 }
 
-func Receiver(ctx context.Context, TCPPort string) {
-	ls, err := net.Listen("tcp", TCPPort)
-	if err != nil {
-		fmt.Println("The connection failed. Error:", err)
-		return
-	}
-	defer ls.Close()
-
-	fmt.Println("Connected to port:", TCPPort)
-	for {
-		conn, err := ls.Accept()
-		if err != nil {
-			fmt.Println("Error: ", err)
-			continue
-		}
-
-		go handleConnection(conn)
-		time.Sleep(1 * time.Second)
-	}
+type MsgString struct {
+	Type    MessageType `json:"type"`
+	Content string      "json:content"
 }
 
-func handleConnection(conn net.Conn) {
-	defer conn.Close()
-
-	//Accept
-	fmt.Printf("Accepted connection from %s\n", conn.LocalAddr())
-
-	//Send
-	msg := fmt.Sprintf("Connect to: %s\n", conn.LocalAddr())
-	conn.Write([]byte(msg))
+type ClientUpdate struct {
+	Client []string
+	New    string
+	Lost   []string
 }
 
-func Transmitter(TCPPort string) {
-	conn, err := net.Dial("tcp", TCPPort)
-	if err != nil {
-		fmt.Println("The connection failed. Error: ", err)
-		return
-	} else {
-		fmt.Printf("The connection was established to: %s \n", conn.RemoteAddr()) //wtf
+type ElevatorSystemChannels struct {
+	FSMStateUpdateCh          chan hall_request_assigner.ActiveElevator
+	FSMHallOrderCompleteCh    chan elevio.ButtonEvent
+	StateUpdateCh             chan hall_request_assigner.ActiveElevator
+	HallOrderCompleteCh       chan elevio.ButtonEvent
+	DisconnectedElevatorCh    chan string
+	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool
+	AssignHallRequestsMapCh   chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool
+	AckCh                     chan bool
+}
+
+func NewElevatorSystemChannels() ElevatorSystemChannels {
+	return ElevatorSystemChannels{
+		FSMStateUpdateCh:          make(chan hall_request_assigner.ActiveElevator, 1024),
+		FSMHallOrderCompleteCh:    make(chan elevio.ButtonEvent, 1024),
+		StateUpdateCh:             make(chan hall_request_assigner.ActiveElevator, 1024),
+		HallOrderCompleteCh:       make(chan elevio.ButtonEvent, 1024),
+		DisconnectedElevatorCh:    make(chan string, 1024),
+		FSMAssignedHallRequestsCh: make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
+		AssignHallRequestsMapCh:   make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
+		AckCh:                     make(chan bool, 64),
 	}
-
-	conn.Write([]byte("From client!"))
-
-	buffer := make([]byte, 1024)
-	bytes, err := conn.Read(buffer)
-	if err != nil {
-		fmt.Println("Error resolving UDP address:", err)
-		return
-	}
-
-	fmt.Println(string(buffer[:bytes]))
-
-	defer conn.Close()
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(ctx context.Context, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
-	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT)
+func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) {
+	clientUpdateCh := make(chan ClientUpdate)
+	//clientTxEnable := make(chan bool)
+	var id string
+
+	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT, clientUpdateCh)
 	if isPrimary {
+		if id == "" {
+			localIP, err := LocalIP()
+			if err != nil {
+				fmt.Println(err)
+				localIP = "DISCONNECTED"
+			}
+			id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
+			fmt.Printf("My id: %s\n", id)
+		}
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh)
+		go PrimaryRoutine(id, isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
+		if id == "" {
+			localIP, err := LocalIP()
+			if err != nil {
+				fmt.Println(err)
+				localIP = "DISCONNECTED"
+			}
+			id = fmt.Sprintf("Client-%s-%d\n", localIP, os.Getpid())
+			fmt.Printf("My id: %s", id)
+		}
 		log.Println("Operating as client...")
-		go TCPDialPrimary(primaryAddress, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
+		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		conn, _ := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
-		BackupRoutine(conn, primaryAddress)
+		BackupRoutine(conn, primaryAddress+DETECTION_PORT)
 	}
 }
 
@@ -176,13 +136,14 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 	}
 	defer ls.Close()
 
-	fmt.Println("Primary is listening for new connections to port:", TCPPort)
+	fmt.Println("-TCPListenForNewPrimary() listening for new primary connections to port:", TCPPort)
 	for {
 		conn, err := ls.Accept()
 		if err != nil {
 			fmt.Println("Error: ", err)
 			continue
 		}
+
 		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
 		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
 	}
@@ -194,12 +155,12 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 
 	ls, err := net.Listen("tcp", port)
 	if err != nil {
-		fmt.Println("The connection failed. Error:", err)
+		fmt.Println("TCPListenForBackupPromotion - The connection failed. Error:", err)
 		return nil, err
 	}
 	defer ls.Close()
 
-	fmt.Println("Primary is listening for new connections to port:", port)
+	fmt.Println("TCPListenForBackupPromotion -  listening for new backup connections to port:", port)
 	for {
 		conn, err := ls.Accept()
 		if err != nil {
@@ -208,10 +169,6 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 		}
 		return conn, nil
 	}
-}
-
-func SecondaryRoutine(conn net.Conn) {
-	fmt.Println("I'm a Secondary, doing Secondary things")
 }
 
 func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
@@ -231,12 +188,12 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 }
 
 func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) { // NOT TESTED!
-	fmt.Printf("*New connection accepted from adress: %s\n", conn.LocalAddr())
+	fmt.Printf("RecieveAssignedHallRequests() - *New connection accepted from address: %s\n", conn.LocalAddr())
 
 	defer conn.Close()
 
 	for {
-		var buf [1024]byte
+		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> TODO: Do something
@@ -258,7 +215,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 }
 
 func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
-	fmt.Println("Conection established to: ", conn.RemoteAddr())
+	fmt.Println("- sendLocalStatesToPrimaryLoop() - Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
 
 	for {
@@ -293,7 +250,7 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 
 			data, err := json.Marshal(my_ButtonEventMsg)
 			if err != nil {
-				fmt.Println("Error sending to Primary: ", err)
+				fmt.Println("Error encoding MsgButtonEvent to json: ", err)
 				return
 			}
 
@@ -341,18 +298,17 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	// type StateUpdateCh = IP + elevatorStates
 	// type HallOrderCopleteCh = floor number (of cab call completed)
 
-	fmt.Printf("*New connection accepted from adress: %s\n", conn.LocalAddr())
+	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
 
 	defer conn.Close()
 
 	for {
-		fmt.Printf("STILL IN READING LOOP PRIMARY SIDE")
 		// Create buffer and read data into the buffer using conn.Read()
-		var buf [1024]byte
+		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
-			DisconnectedElevatorCh <- conn.LocalAddr().String()
+			DisconnectedElevatorCh <- conn.LocalAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
 			log.Fatal(err)
 		}
 
@@ -379,6 +335,13 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			}
 			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
 			HallOrderCompleteCh <- msg.Content
+		case TypeString:
+			var msg MsgString
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Received string object: %+v\n", msg)
+			DisconnectedElevatorCh <- msg.Content
 
 		default:
 			fmt.Println("Unknown message type")
@@ -387,15 +350,15 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 }
 
 func TCPDialBackup(address string, port string) net.Conn {
-	fmt.Println("Connecting by TCP to the address: ", address)
+	fmt.Println("TCPDialBackup() - Connecting by TCP to the address: ", address+port)
 
-	conn, err := net.Dial("tcp", address)
+	conn, err := net.Dial("tcp", address+port)
 	if err != nil {
-		fmt.Println("Connection failed. Error: ", err)
+		fmt.Println("Error in TCPDialBackup() - Connection failed. Error: ", err)
 		return nil
 	}
 
-	fmt.Println("Conection established to: ", conn.RemoteAddr())
+	fmt.Println("TCPDialBackup() - Conection established to: ", conn.RemoteAddr())
 	return conn
 }
 
@@ -519,4 +482,12 @@ func GetLocalIPv4() string {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
 	return localAddr.IP.String()
+}
+
+func StringPortToInt(port string) int {
+	portWithoutColon := strings.TrimPrefix(port, ":")
+
+	portInt, _ := strconv.Atoi(portWithoutColon)
+
+	return portInt
 }
