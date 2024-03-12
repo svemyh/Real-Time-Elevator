@@ -69,6 +69,7 @@ type ElevatorSystemChannels struct {
 	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool
 	AssignHallRequestsMapCh   chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool
 	AckCh                     chan bool
+	PrimaryDeadCh             chan bool
 }
 
 func NewElevatorSystemChannels() ElevatorSystemChannels {
@@ -81,11 +82,12 @@ func NewElevatorSystemChannels() ElevatorSystemChannels {
 		FSMAssignedHallRequestsCh: make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
 		AssignHallRequestsMapCh:   make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024),
 		AckCh:                     make(chan bool, 64),
+		PrimaryDeadCh:             make(chan bool, 2),
 	}
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) {
+func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool, PrimaryDeadCh chan bool) {
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
 	var id string
@@ -102,7 +104,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 			fmt.Printf("My id: %s\n", id)
 		}
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(id, isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+		go PrimaryRoutine(isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
@@ -117,35 +119,58 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		}
 		log.Println("Operating as client...")
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
+		go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh, PrimaryDeadCh)
 		conn, _ := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
-		BackupRoutine(conn, primaryAddress+DETECTION_PORT)
+		BackupRoutine(conn, primaryAddress+DETECTION_PORT,
+			StateUpdateCh,
+			HallOrderCompleteCh,
+			DisconnectedElevatorCh,
+			FSMAssignedHallRequestsCh,
+			AssignHallRequestsCh, AckCh, PrimaryDeadCh)
 	}
 }
 
 // Checks the event that a backup has become a new primary and wants to establish connection. This go routine should be shut down at some point
-func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPListenForNewPrimary(TCPPort string,
+	FSMStateUpdateCh chan hall_request_assigner.ActiveElevator,
+	FSMHallOrderCompleteCh chan elevio.ButtonEvent,
+	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	PrimaryDeadCh chan bool) {
 	fmt.Println("- Executing TCPListenForNewPrimary()")
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
 	//go TCPReadElevatorStates(stateUpdateCh)
 	ls, err := net.Listen("tcp", TCPPort)
 	if err != nil {
-		fmt.Println("The connection failed. Error:", err)
+		fmt.Println("TCPListenForNewPrimary() - The connection failed. Error:", err)
 		return
 	}
 	defer ls.Close()
 
 	fmt.Println("-TCPListenForNewPrimary() listening for new primary connections to port:", TCPPort)
-	for {
-		conn, err := ls.Accept()
-		if err != nil {
-			fmt.Println("Error: ", err)
-			continue
-		}
+	acceptCh := make(chan net.Conn)
+	errCh := make(chan error)
 
-		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
-		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
+	for {
+		go func() {
+			conn, err := ls.Accept()
+			if err != nil {
+				errCh <- err
+				return
+			}
+			acceptCh <- conn
+		}()
+
+		select {
+		case <- PrimaryDeadCh:
+			log.Println("Requesting return in TCPListenForNewPrimary")
+			return
+		case err := <-errCh:
+			fmt.Println("Error accepting connection:", err)
+		case conn := <-acceptCh:
+			go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
+			go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh)
+		}
 	}
 }
 
@@ -193,6 +218,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 	defer conn.Close()
 
 	for {
+
 		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {

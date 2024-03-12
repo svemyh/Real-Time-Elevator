@@ -3,8 +3,6 @@ package main
 import (
 	"elevator/elevio"
 	"elevator/fsm"
-
-	//"elevator/hall_request_assigner"
 	"elevator/network"
 	"fmt"
 )
@@ -23,15 +21,6 @@ func main() {
 		ObstructionCh:   make(chan bool),
 	}
 
-	/* CLEANUP. Moved to network
-	FSMStateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
-	FSMHallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
-	StateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
-	HallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
-	DisconnectedElevatorCh := make(chan string, 1024)
-	FSMAssignedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
-	AssignHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
-	*/
 	//fsm_terminate := make(chan, bool)
 
 	go elevio.PollFloorSensor(device.FloorSensorCh)
@@ -39,7 +28,7 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
+	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh, Channels.PrimaryDeadCh) // Alias: RunPrimaryBackup()
 
 	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
