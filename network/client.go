@@ -1,5 +1,10 @@
 package network
 
+import (
+	"fmt"
+	"net"
+)
+
 /*
 import (
 	"context"
@@ -26,3 +31,24 @@ func BecomeBackup() {
 
 }
 */
+// will simply be a net.Listen("TCP", "TCP_BACKUP_PORT"). This blocks code until a connection is established
+func TCPListenForBackupPromotion(port string) (net.Conn, error) {
+	fmt.Println(" - Executing TCPListenForBackupPromotion()")
+
+	ls, err := net.Listen("tcp", port)
+	if err != nil {
+		fmt.Println("TCPListenForBackupPromotion - The connection failed. Error:", err)
+		return nil, err
+	}
+	defer ls.Close()
+
+	fmt.Println("TCPListenForBackupPromotion -  listening for new backup connections to port:", port)
+	for {
+		conn, err := ls.Accept()
+		if err != nil {
+			fmt.Println("Error: ", err)
+			continue
+		}
+		return conn, nil
+	}
+}

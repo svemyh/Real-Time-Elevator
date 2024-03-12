@@ -182,19 +182,19 @@ func handleTCPConnection(conn net.Conn, id string, clientUpdateCh chan<- ClientU
 
 	}
 }
-func PrimaryRoutine(id string, isPrimary bool, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
+func PrimaryRoutine(isPrimary bool, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
 
 	clientTxEnable := make(chan bool)
 	InitActiveElevators := make([]hall_request_assigner.ActiveElevator, 0)
 	clientUpdateCh := make(chan ClientUpdate)
-	helloRx := make(chan ElevatorSystemChannels)
+	//helloRx := make(chan ElevatorSystemChannels)
 
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                                //Continously broadcast that you are a primary on UDP
 	go TCPListenForNewElevators(TCP_LISTEN_PORT, isPrimary, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(StateUpdateCh, HallOrderCompleteCh, InitActiveElevators, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
-
+	/*
 	for {
 		select {
 		case c := <-clientUpdateCh:
@@ -207,6 +207,7 @@ func PrimaryRoutine(id string, isPrimary bool, StateUpdateCh chan hall_request_a
 			fmt.Printf("Received: %#v\n", a)
 		}
 	}
+	*/
 }
 
 // get new states everytime a local elevator updates their states.

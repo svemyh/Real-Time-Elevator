@@ -1,32 +1,31 @@
 package network
 
 import (
+	"context"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 )
 
-
 const (
-    DETECTION_PORT   = ":10002"
-    TCP_LISTEN_PORT  = ":10001"
-    TCP_BACKUP_PORT  = ":15000"
+	DETECTION_PORT  = ":10002"
+	TCP_LISTEN_PORT = ":10001"
+	TCP_BACKUP_PORT = ":15000"
 )
 
 type MessageType string
 
 const (
-	bufSize = 1024
+	bufSize     = 1024
 	udpInterval = 2 * time.Second
-	timeout = 500 * time.Millisecond
+	timeout     = 500 * time.Millisecond
 )
 
 const (
@@ -89,46 +88,61 @@ func NewElevatorSystemChannels() ElevatorSystemChannels {
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) {
+func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator,
+	FSMHallOrderCompleteCh chan elevio.ButtonEvent,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool) {
+
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
-	var id string
 
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT, clientUpdateCh)
-	if isPrimary {
-		if id == "" {
-			localIP, err := LocalIP()
-			if err != nil {
-				fmt.Println(err)
-				localIP = "DISCONNECTED"
+
+	if isPrimary { // If primary
+		/*
+			if id == "" {
+				localIP, err := LocalIP()
+				if err != nil {
+					fmt.Println(err)
+					localIP = "DISCONNECTED"
+				}
+				id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
+				fmt.Printf("My id: %s\n", id)
 			}
-			id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
-			fmt.Printf("My id: %s\n", id)
-		}
+		*/
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(id, isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+		go PrimaryRoutine(isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-	} else {
-		if id == "" {
-			localIP, err := LocalIP()
-			if err != nil {
-				fmt.Println(err)
-				localIP = "DISCONNECTED"
+	} else { // If not primary, become client --- Currently set to backup?
+		/*
+			if id == "" {
+				localIP, err := LocalIP()
+				if err != nil {
+					fmt.Println(err)
+					localIP = "DISCONNECTED"
+				}
+				id = fmt.Sprintf("Client-%s-%d\n", localIP, os.Getpid())
+				fmt.Printf("My id: %s", id)
 			}
-			id = fmt.Sprintf("Client-%s-%d\n", localIP, os.Getpid())
-			fmt.Printf("My id: %s", id)
-		}
+		*/
 		log.Println("Operating as client...")
+
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
+		//go TCPListenForNewPrimary(TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
+
 		conn, _ := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
-		BackupRoutine(conn, primaryAddress+DETECTION_PORT)
+
+		BackupRoutine(conn, primaryAddress+DETECTION_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	}
 }
 
 // Checks the event that a backup has become a new primary and wants to establish connection. This go routine should be shut down at some point
-func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPListenForNewPrimary(ctx context.Context, TCPPort string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	fmt.Println("- Executing TCPListenForNewPrimary()")
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
@@ -142,36 +156,19 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 
 	fmt.Println("-TCPListenForNewPrimary() listening for new primary connections to port:", TCPPort)
 	for {
-		conn, err := ls.Accept()
-		if err != nil {
-			fmt.Println("Error: ", err)
-			continue
+		select { // help
+		case <-ctx.Done():
+			fmt.Println("TCPListenForNewPrimary goroutine cancelled")
+			return
+		default:
+			conn, err := ls.Accept()
+			if err != nil {
+				fmt.Println("Error: ", err)
+				continue
+			}
+			go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
+			go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
 		}
-
-		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
-		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
-	}
-}
-
-// will simply be a net.Listen("TCP", "TCP_BACKUP_PORT"). This blocks code until a connection is established
-func TCPListenForBackupPromotion(port string) (net.Conn, error) {
-	fmt.Println(" - Executing TCPListenForBackupPromotion()")
-
-	ls, err := net.Listen("tcp", port)
-	if err != nil {
-		fmt.Println("TCPListenForBackupPromotion - The connection failed. Error:", err)
-		return nil, err
-	}
-	defer ls.Close()
-
-	fmt.Println("TCPListenForBackupPromotion -  listening for new backup connections to port:", port)
-	for {
-		conn, err := ls.Accept()
-		if err != nil {
-			fmt.Println("Error: ", err)
-			continue
-		}
-		return conn, nil
 	}
 }
 

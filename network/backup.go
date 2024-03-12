@@ -17,7 +17,12 @@ type Backup struct {
 	lastSeen time.Time
 }
 
-func BackupRoutine(conn net.Conn, primaryAddress string) {
+func BackupRoutine(conn net.Conn,
+	primaryAddress string,
+	FSMStateUpdateCh chan hall_request_assigner.ActiveElevator,
+	FSMHallOrderCompleteCh chan elevio.ButtonEvent,
+	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+
 	BackupActiveElevatorMap := make(map[string]elevator.Elevator)
 	var BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 
@@ -25,7 +30,13 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 	//TODO: Read states sendt through primary connection (make an array to contain -> activeElevators)
 	//TODO: If backup unresponsive --> BecomePrimary(activeElevators). TODO: INIT A BACKUP IN BecomePrimary()
 	//fmt.Println("Im a backup, doing backup things")
-	PrimaryDeadCh := make(chan bool) 
+	PrimaryDeadCh := make(chan bool)
+
+	backupCtx, cancelBackup := context.WithCancel(ctx)
+	defer cancelBackup()
+
+	go TCPListenForNewPrimary(backupCtx, TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
+
 	go CheckPrimaryAlive(primaryAddress, PrimaryDeadCh)
 
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
@@ -51,9 +62,15 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 			fmt.Println("BACKUP received disconnectedElevator: ", disconnectedElevator)
 			delete(BackupActiveElevatorMap, disconnectedElevator)
 			TCPSendACK(conn)
-		
-		case <-PrimaryDeadCh: 
+
+		case <-PrimaryDeadCh:
 			log.Printf("Becoming Primary")
+			cancelBackup()
+			fmt.Println("Requesting cancellation")	// why doesnt TCPListenForNewPrimary cancel prior to time.Sleep independent of time?
+			time.Sleep(1 * time.Second)
+			go PrimaryRoutine(true, NewElevatorSystemChannels().StateUpdateCh, NewElevatorSystemChannels().HallOrderCompleteCh, NewElevatorSystemChannels().DisconnectedElevatorCh, NewElevatorSystemChannels().AssignHallRequestsMapCh, NewElevatorSystemChannels().AckCh)
+			time.Sleep(1500 * time.Millisecond)
+			TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		}
 	}
 }
@@ -77,7 +94,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("Timeout reached without receiving %s, backup is becoming primary...", buffer[:n])
 				PrimaryDeadCh <- true
-				return 
+				return
 			}
 			log.Printf("Error reading from UDP: %v\n", err)
 			return
@@ -105,7 +122,7 @@ func BecomePrimary(activeElevator []Elevator) {
 }
 */
 
-func BackupReceiver(ctx context.Context, TCPPort string) {
+func BackupReceiver(TCPPort string) {
 
 }
 
