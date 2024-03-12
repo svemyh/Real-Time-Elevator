@@ -24,8 +24,8 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 	//TODO: Monitor that primary connection is alive
 	//TODO: Read states sendt through primary connection (make an array to contain -> activeElevators)
 	//TODO: If backup unresponsive --> BecomePrimary(activeElevators). TODO: INIT A BACKUP IN BecomePrimary()
-	fmt.Println("Im a backup, doing backup things")
-	PrimaryDeadCh := make(chan bool)
+	//fmt.Println("Im a backup, doing backup things")
+	PrimaryDeadCh := make(chan bool) 
 	go CheckPrimaryAlive(primaryAddress, PrimaryDeadCh)
 
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
@@ -37,20 +37,23 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 	for {
 		select {
 		case stateUpdate := <-BackupStateUpdateCh:
-			fmt.Println("BACKUP recieved stateUpdate: ", stateUpdate)
+			fmt.Println("BACKUP received stateUpdate: ", stateUpdate)
 			BackupActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
 			BackupCombinedHallRequests = UpdateCombinedHallRequests(BackupActiveElevatorMap, BackupCombinedHallRequests)
 			TCPSendACK(conn)
 
 		case completedOrder := <-BackupHallOrderCompleteCh:
-			fmt.Println("BACKUP recieved completedOrder: ", completedOrder)
+			fmt.Println("BACKUP received completedOrder: ", completedOrder)
 			BackupCombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
 			TCPSendACK(conn)
 
 		case disconnectedElevator := <-BackupDisconnectedElevatorCh:
-			fmt.Println("BACKUP recieved disconnectedElevator: ", disconnectedElevator)
+			fmt.Println("BACKUP received disconnectedElevator: ", disconnectedElevator)
 			delete(BackupActiveElevatorMap, disconnectedElevator)
 			TCPSendACK(conn)
+		
+		case <-PrimaryDeadCh: 
+			log.Printf("Becoming Primary")
 		}
 	}
 }
@@ -74,7 +77,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("Timeout reached without receiving %s, backup is becoming primary...", buffer[:n])
 				PrimaryDeadCh <- true
-				return
+				return 
 			}
 			log.Printf("Error reading from UDP: %v\n", err)
 			return

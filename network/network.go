@@ -14,16 +14,20 @@ import (
 	"time"
 )
 
-var DETECTION_PORT string = ":10002"
-var TCP_LISTEN_PORT string = ":10001"
-var TCP_BACKUP_PORT string = ":15000"
+
+const (
+    DETECTION_PORT   = ":10002"
+    TCP_LISTEN_PORT  = ":10001"
+    TCP_BACKUP_PORT  = ":15000"
+)
 
 type MessageType string
 
-const bufSize = 1024
-
-const udpInterval = 2 * time.Second
-const timeout = 500 * time.Millisecond
+const (
+	bufSize = 1024
+	udpInterval = 2 * time.Second
+	timeout = 500 * time.Millisecond
+)
 
 const (
 	TypeActiveElevator MessageType = "ActiveElevator"
