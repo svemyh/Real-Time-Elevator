@@ -33,16 +33,4 @@ type ElevInputDevice struct {
 	ObstructionCh   chan bool
 }
 
-type IndividualButton struct {
-	Button ButtonType
-	floor  int
-	value  bool
-}
 
-type ElevOutputDevice struct {
-	FloorIndicator     int
-	RequestButtonLight IndividualButton
-	DoorLight          bool
-	StopButtonLight    bool
-	MotorDirection     Dirn
-}

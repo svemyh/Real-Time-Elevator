@@ -14,7 +14,8 @@ func main() {
 
 	fmt.Printf("Started!\n")
 
-	Channels := network.NewElevatorSystemChannels()
+	ElevatorChannels := network.NewElevatorSystemChannels()
+	FSMChannels := network.NewFSMSystemChannels()
 
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int),
@@ -39,9 +40,9 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
+	go network.InitNetwork(FSMChannels, ElevatorChannels) // Alias: RunPrimaryBackup()
 
-	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
+	go fsm.FsmRun(device, FSMChannels) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
 	go network.RestartOnReconnect()
 
