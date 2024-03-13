@@ -97,7 +97,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 			conn.SetReadDeadline(time.Now().Add(udpInterval)) // Reset readDeadline
 		}
 		// If received message is not "OptimusPrime", keep listening until timeout
-		//At timeout become a primary
+		// At timeout become a primary
 	}
 }
 

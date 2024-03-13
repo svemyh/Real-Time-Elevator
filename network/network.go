@@ -1,10 +1,10 @@
 package network
 
 import (
+	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
-	"elevator/elevator"
 	"fmt"
 	"log"
 	"net"
@@ -17,6 +17,7 @@ import (
 
 var DETECTION_PORT string = ":10002"
 var TCP_LISTEN_PORT string = ":10001"
+var HALL_LIGHTS_PORT string = ":10003"
 var TCP_BACKUP_PORT string = ":15000"
 var TCP_NEW_PRIMARY_LISTEN_PORT = ":15500"
 
@@ -28,10 +29,11 @@ const udpInterval = 2 * time.Second
 const timeout = 500 * time.Millisecond
 
 const (
-	TypeActiveElevator MessageType = "ActiveElevator"
-	TypeButtonEvent    MessageType = "ButtonEvent"
-	TypeACK            MessageType = "ACK"
-	TypeString         MessageType = "string"
+	TypeActiveElevator       MessageType = "ActiveElevator"
+	TypeButtonEvent          MessageType = "ButtonEvent"
+	TypeACK                  MessageType = "ACK"
+	TypeString               MessageType = "string"
+	TypeCombinedHallRequests MessageType = "CombinedHallRequests"
 )
 
 type Message interface{}
@@ -54,6 +56,11 @@ type MsgACK struct {
 type MsgString struct {
 	Type    MessageType `json:"type"`
 	Content string      "json:content"
+}
+
+type MsgCombinedHallRequests struct {
+	Type    MessageType                                 `json:"type"`
+	Content [elevio.N_Floors][elevio.N_Buttons - 1]bool "json:content"
 }
 
 type ClientUpdate struct {

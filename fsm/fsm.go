@@ -33,11 +33,9 @@ func init() {
 }
 
 // SetAllLights sets the button lamps for all floors and buttons based on the elevator's request state.
-func SetAllLights() {
+func SetAllCabLights() {
 	for floor := 0; floor < elevio.N_Floors; floor++ {
-		for btn := 0; btn < elevio.N_Buttons; btn++ {
-			elevio.SetButtonLamp(elevio.ButtonType(btn), floor, elevatorState.Requests[floor][btn])
-		}
+		elevio.SetButtonLamp(elevio.ButtonType(elevio.BT_Cab), floor, elevatorState.Requests[floor][elevio.BT_Cab])
 	}
 }
 
@@ -83,7 +81,7 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCo
 		}
 	}
 
-	SetAllLights()
+	SetAllCabLights()
 
 	//fmt.Println("\nNew state:")
 }
@@ -101,7 +99,7 @@ func FsmOnFloorArrival(newFloor int, FSMHallOrderCompleteCh chan elevio.ButtonEv
 			elevio.SetDoorOpenLamp(true)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh)
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
-			SetAllLights()
+			SetAllCabLights()
 			elevatorState.Behaviour = elevator.EB_DoorOpen
 		}
 	default:
@@ -122,7 +120,7 @@ func FsmOnDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 			//fmt.Println("EB Door Open")
 			timer.TimerStart(elevatorState.Config.DoorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh)
-			SetAllLights()
+			SetAllCabLights()
 		case elevator.EB_Moving:
 			//fmt.Println("EB moving")
 			elevio.SetDoorOpenLamp(false)

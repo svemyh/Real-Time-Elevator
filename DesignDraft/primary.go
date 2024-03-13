@@ -40,7 +40,7 @@ func AmIPrimary() bool {
 func PrimaryRoutine(StateUpdateCh, OrderCompleteCh, ActiveElevators) {
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
-	go run UDPBroadCastPrimaryRole()  //Continously broadcast that you are a primary on UDP 
+	go run UDPBroadCastPrimaryRole()  //Continously broadcast that you are a primary on UDP
 	go run TCPListenForNewElevators() //Continously listen if new elevator entring networks is trying to establish connection
 	go run HandlePrimaryTasks(StateUpdateCh, OrderCompleteCh, ActiveElevators)
 }

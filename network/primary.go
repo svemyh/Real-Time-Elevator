@@ -58,11 +58,10 @@ func UpdateCombinedHallRequests(ActiveElevatorsMap map[string]elevator.Elevator,
 	return CombinedHallRequests
 }
 
-func UDPBroadCastPrimaryRole(p string, transmitEnable <-chan bool) {
-	port := StringPortToInt(p)
+func UDPBroadCastPrimaryRole(port string, transmitEnable <-chan bool) {
 	key := "OptimusPrime"
 
-	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
+	conn := conn.DialBroadcastUDP(StringPortToInt(port)) // FIX SO THAT ITS COMPATIBLE WITH STRING
 
 	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
 	enable := true
@@ -75,6 +74,25 @@ func UDPBroadCastPrimaryRole(p string, transmitEnable <-chan bool) {
 		if enable {
 			conn.WriteTo([]byte(key), addr)
 			//fmt.Println("Printing key in UDP")
+		}
+	}
+}
+
+func UDPBroadCastCombinedHallRequests(port string, CombinedHallRequests [elevio.N_Floors][2]bool, BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][2]bool) {
+
+	conn := conn.DialBroadcastUDP(StringPortToInt(port)) // FIX SO THAT ITS COMPATIBLE WITH STRING
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", StringPortToInt(port)))
+	if err != nil {
+		fmt.Println("**Error in UDPBroadCastCombinedHallRequests:", err)
+	}
+	ticker := time.Tick(1 * time.Second)
+
+	for {
+		select { // Blocks until signal recieved on either of these
+		case combinedHallRequests := <-BroadcastCombinedHallRequestsCh:
+			CombinedHallRequests = combinedHallRequests
+		case <-ticker:
+			SendCombinedHallRequests(conn, addr, CombinedHallRequests)
 		}
 	}
 }
@@ -147,10 +165,12 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	clientTxEnable := make(chan bool)
 	clientUpdateCh := make(chan ClientUpdate)
 	helloRx := make(chan ElevatorSystemChannels)
+	BroadcastCombinedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool)
 
-	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                     //Continously broadcast that you are a primary on UDP
+	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)
+	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                   //Continously broadcast that you are a primary on UDP
 	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
-	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, BroadcastCombinedHallRequestsCh)
 
 	for {
 		select {
@@ -178,7 +198,8 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 	HallOrderCompleteCh chan elevio.ButtonEvent,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	AckCh chan bool) {
+	AckCh chan bool,
+	BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	BackupAddr := ""
 	var backupConn net.Conn
 	//var ActiveElevators []ActiveElevator // init here or take in as param to func, allows Backup.BecomePrimary to send in prev states
@@ -221,7 +242,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				TCPSendActiveElevator(backupConn, stateUpdate) // TODO: Needs to be updated to TCPSendActiveElevatorWithAck() which blocks until ack recieved.
 				//This function is only for the backup/primary-communication.
 				CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
-
+				BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 				go func() {
 					select { // Blocks until signal received on either of these
 					case <-AckCh:
@@ -236,6 +257,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 
 			// For test purposes
 			CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
+			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 			AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 
 			//if len(ActiveElevators) > 1 {
@@ -258,6 +280,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			//TODO: clear order from some sort of global HALLREQ array
 			fmt.Println("\n---- Order completed at floor:", completedOrder)
 			CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
+			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
@@ -343,7 +366,6 @@ func GetMapKey(ActiveElevatorMap map[string]elevator.Elevator) string {
 }
 
 func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.ActiveElevator) {
-	time.Sleep(50 * time.Millisecond)
 	myActiveElevatorMsg := MsgActiveElevator{
 		Type:    TypeActiveElevator,
 		Content: activeElevator,
@@ -385,7 +407,6 @@ func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
 }
 
 func TCPSendACK(conn net.Conn) {
-	time.Sleep(50 * time.Millisecond)
 	myACKMsg := MsgACK{
 		Type:    TypeACK,
 		Content: true,
@@ -407,7 +428,6 @@ func TCPSendACK(conn net.Conn) {
 }
 
 func TCPSendString(conn net.Conn, str string) {
-	time.Sleep(50 * time.Millisecond)
 	myStringMsg := MsgString{
 		Type:    TypeString,
 		Content: str,
@@ -426,6 +446,67 @@ func TCPSendString(conn net.Conn, str string) {
 		return
 	}
 	time.Sleep(50 * time.Millisecond)
+}
+
+func SendCombinedHallRequests(conn net.PacketConn, UDPaddr *net.UDPAddr, CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	myMsgCombinedHallRequests := MsgCombinedHallRequests{
+		Type:    TypeCombinedHallRequests,
+		Content: CombinedHallRequests,
+	}
+
+	data, err := json.Marshal(myMsgCombinedHallRequests) // TODO: REFACTOR - Do definition of MsgCombinedHallRequests inline here.
+	if err != nil {
+		fmt.Println("Error encoding MsgCombinedHallRequests to json: ", err)
+		return
+	}
+
+	_, err = conn.WriteTo(data, UDPaddr)
+	if err != nil {
+		fmt.Println("Error sending MsgCombinedHallRequests: ", err)
+		return
+	}
+
+	time.Sleep(50 * time.Millisecond)
+}
+
+func UDPReadCombinedHallRequests(port string) {
+	conn := conn.DialBroadcastUDP(StringPortToInt(port))
+
+	defer conn.Close()
+	for {
+		var buf [bufSize]byte
+		n, _, err := conn.ReadFrom(buf[:])
+		if err != nil {
+			continue
+		}
+
+		var genericMsg map[string]interface{}
+		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
+			fmt.Println("Error unmarshaling generic message: ", err)
+			log.Fatal(err)
+		}
+
+		switch MessageType(genericMsg["type"].(string)) {
+		case TypeCombinedHallRequests:
+			var msg MsgCombinedHallRequests
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				fmt.Println("UDPReadCombinedHallRequests() - Error unmarshaling MsgCombinedHallRequests from Primary: ", err)
+				continue
+			}
+			SetAllHallLights(msg.Content)
+
+		default:
+			fmt.Println("Unknown message type recieved")
+		}
+	}
+}
+
+func SetAllHallLights(CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	for floor := 0; floor < elevio.N_Floors; floor++ {
+		for btn := 0; btn < 2; btn++ {
+			elevio.SetButtonLamp(elevio.ButtonType(btn), floor, CombinedHallRequests[floor][btn])
+		}
+	}
 }
 
 // Alias: Server()
