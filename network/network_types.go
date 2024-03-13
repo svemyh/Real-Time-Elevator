@@ -63,7 +63,7 @@ type ClientUpdate struct {
 
 type ElevatorSystemChannels struct { 										// Find a better name. It got ONE map smh
 	ActiveElevatorMap 		  map[string]elevator.Elevator
-	CombinedHallRequests 	  [elevio.N_Floors][elevio.N_Buttons-1]bool		// As this asks for HallRequests, one row of buttons composing CabRequests gets subtracted
+			
 	StateUpdateCh             chan hall_request_assigner.ActiveElevator
 	HallOrderCompleteCh       chan elevio.ButtonEvent
 	DisconnectedElevatorCh    chan string

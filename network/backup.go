@@ -119,7 +119,6 @@ func BecomeNewPrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 
 	NewPrimaryChannels := ElevatorSystemChannels{
 		BackupActiveElevatorMap,
-		BackupCombinedHallRequests,
 		E.StateUpdateCh,
 		E.HallOrderCompleteCh,
 		E.DisconnectedElevatorCh,
@@ -130,9 +129,9 @@ func BecomeNewPrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	time.Sleep(1500 * time.Millisecond)
 
 /*
-	PrimaryRoutine(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+	PrimaryRoutine(BackupActiveElevatorMap, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 
 */
-	PrimaryRoutine(NewPrimaryChannels)
+	PrimaryRoutine(NewPrimaryChannels, BackupCombinedHallRequests)
 
 }

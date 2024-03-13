@@ -136,7 +136,7 @@ func TCPListenForNewElevators(TCPPort string, E ElevatorSystemChannels) {
 	}
 }
 
-func PrimaryRoutine(E ElevatorSystemChannels) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
+func PrimaryRoutine(E ElevatorSystemChannels, CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
 
@@ -144,9 +144,9 @@ func PrimaryRoutine(E ElevatorSystemChannels) { // Arguments: StateUpdateCh, Ord
 	BroadcastCombinedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, bufSize)
 
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)
-	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, E.CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                   //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT, E) //Continously listen if new elevator entring networks is trying to establish connection
-	go HandlePrimaryTasks(E, BroadcastCombinedHallRequestsCh)
+	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh) //Continously broadcast that you are a primary on UDP
+	go TCPListenForNewElevators(TCP_LISTEN_PORT, E)                                                              //Continously listen if new elevator entring networks is trying to establish connection
+	go HandlePrimaryTasks(E, CombinedHallRequests, BroadcastCombinedHallRequestsCh)
 }
 
 // get new states everytime a local elevator updates their states.
@@ -155,7 +155,7 @@ func PrimaryRoutine(E ElevatorSystemChannels) { // Arguments: StateUpdateCh, Ord
 // then if we have other elevators on network then assign hall req for each elevator(by cost) distribute them and button lights
 // if there are other elevators on network then send states to the backup
 
-func HandlePrimaryTasks(E ElevatorSystemChannels, BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func HandlePrimaryTasks(E ElevatorSystemChannels, CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool, BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) { //BroadcastCombinedHallRequestsCh could be in ElevatorSystemChannels
 
 	BackupAddr := ""
 	var backupConn net.Conn
@@ -170,7 +170,7 @@ func HandlePrimaryTasks(E ElevatorSystemChannels, BroadcastCombinedHallRequestsC
 	}
 	for {
 		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", E.ActiveElevatorMap)
-		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", E.CombinedHallRequests)
+		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
 		case stateUpdate := <-E.StateUpdateCh: //updates if new state is sendt on one of TCP conns, blocks if not
 			//TODO: compare the state update from single elevator to active elevator array and update activeElevators
@@ -198,13 +198,13 @@ func HandlePrimaryTasks(E ElevatorSystemChannels, BroadcastCombinedHallRequestsC
 				}
 				TCPSendActiveElevator(backupConn, stateUpdate) // TODO: Needs to be updated to TCPSendActiveElevatorWithAck() which blocks until ack recieved.
 				//This function is only for the backup/primary-communication.
-				E.CombinedHallRequests = UpdateCombinedHallRequests(E.ActiveElevatorMap, E.CombinedHallRequests)
-				BroadcastCombinedHallRequestsCh <- E.CombinedHallRequests
+				CombinedHallRequests = UpdateCombinedHallRequests(E.ActiveElevatorMap, CombinedHallRequests)
+				BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 				go func() {
 					select { // Blocks until signal received on either of these
 					case <-E.AckCh:
 						fmt.Println("ACK received: In case stateUpdate")
-						E.AssignHallRequestsMapCh <- hall_request_assigner.HallRequestAssigner(E.ActiveElevatorMap, E.CombinedHallRequests)
+						E.AssignHallRequestsMapCh <- hall_request_assigner.HallRequestAssigner(E.ActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
@@ -213,9 +213,9 @@ func HandlePrimaryTasks(E ElevatorSystemChannels, BroadcastCombinedHallRequestsC
 			}
 
 			// For test purposes
-			E.CombinedHallRequests = UpdateCombinedHallRequests(E.ActiveElevatorMap, E.CombinedHallRequests)
-			BroadcastCombinedHallRequestsCh <- E.CombinedHallRequests
-			E.AssignHallRequestsMapCh <- hall_request_assigner.HallRequestAssigner(E.ActiveElevatorMap, E.CombinedHallRequests)
+			CombinedHallRequests = UpdateCombinedHallRequests(E.ActiveElevatorMap, CombinedHallRequests)
+			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
+			E.AssignHallRequestsMapCh <- hall_request_assigner.HallRequestAssigner(E.ActiveElevatorMap, CombinedHallRequests)
 
 			//if len(ActiveElevators) > 1 {
 			//TODO: assign  new backup if needed based based on state update.
@@ -236,8 +236,8 @@ func HandlePrimaryTasks(E ElevatorSystemChannels, BroadcastCombinedHallRequestsC
 		case completedOrder := <-E.HallOrderCompleteCh:
 			//TODO: clear order from some sort of global HALLREQ array
 			fmt.Println("\n---- Order completed at floor:", completedOrder)
-			E.CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
-			BroadcastCombinedHallRequestsCh <- E.CombinedHallRequests
+			CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
+			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 
 			if len(E.ActiveElevatorMap) >= 2 {
 				if _, exists := E.ActiveElevatorMap[BackupAddr]; !exists {
@@ -285,7 +285,7 @@ func HandlePrimaryTasks(E ElevatorSystemChannels, BroadcastCombinedHallRequestsC
 					select { // Blocks until signal received on either of these
 					case <-E.AckCh:
 						fmt.Println("ACK received: In case stateUpdate")
-						E.AssignHallRequestsMapCh <- hall_request_assigner.HallRequestAssigner(E.ActiveElevatorMap, E.CombinedHallRequests)
+						E.AssignHallRequestsMapCh <- hall_request_assigner.HallRequestAssigner(E.ActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead

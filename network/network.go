@@ -1,6 +1,7 @@
 package network
 
 import (
+	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
@@ -55,11 +56,10 @@ func InitNetwork(F FSMSystemChannels, E ElevatorSystemChannels) {
 		log.Println("Operating as primary...")
 
 		//init empty activeElevMap and CombinedHallReq
-		/*
-			var E.CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
-			E.ActiveElevatorMap := make(map[string]elevator.Elevator)
-		*/
-		go PrimaryRoutine(E)
+		var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
+		E.ActiveElevatorMap = make(map[string]elevator.Elevator)
+
+		go PrimaryRoutine(E, CombinedHallRequests)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, F)
 	} else {
