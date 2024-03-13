@@ -116,17 +116,6 @@ func BecomeNewPrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 		go TCPReadElevatorStates(conn, E)
 		go TCPWriteElevatorStates(conn, E)
 	}
-/*
-	const NewPrimaryChannels (
-		BackupActiveElevatorMap
-		BackupCombinedHallRequests  
-		E.StateUpdate
-		E.HallOrderCompleteCh
-		E.DisconnectedElevatorCh
-		E.AssignedHallRequests
-		E.AckCh
-	)
-	*/
 
 	NewPrimaryChannels := ElevatorSystemChannels{
 		BackupActiveElevatorMap,
