@@ -1,7 +1,6 @@
 package network
 
 import (
-	"context"
 	"elevator/conn"
 	"elevator/elevator"
 	"elevator/elevio"
@@ -115,13 +114,24 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	//Needs to run a goroutine TCPReadElevatorStates when connection established
 	//Note, the elevator list will contain your own IP. DO NOT CONNECT TO IT, as PrimaryRoutine will make this connection
 	//(OR HANDLE HERE IF DESIRED)
-	PrimaryRoutine("id", true, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
-}
 
-func BackupReceiver(ctx context.Context, TCPPort string) {
+	//TCPDialAsPrimary
+	for ip, _ := range BackupActiveElevatorMap {
+		fmt.Println("Connecting by TCP to the address: ", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
 
-}
+		conn, err := net.Dial("tcp", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
+		if err != nil {
+			fmt.Println("Connection failed. Error: ", err)
+			return
+		}
 
-func BackupTransmitter(TCPPort string) {
+		fmt.Println("Conection established to: ", conn.RemoteAddr())
 
+		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
+		go TCPWriteElevatorStates(conn, AssignHallRequestsCh)
+	}
+
+	time.Sleep(1500 * time.Millisecond)
+
+	PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 }

@@ -14,6 +14,7 @@ BecomePrimary(activeElevator []Elevator) {
 	//Needs to run a goroutine TCPReadElevatorStates when connection established
 	//Note, the elevator list will contain your own IP. DO NOT CONNECT TO IT, as PrimaryRoutine will make this connection 
 	//(OR HANDLE HERE IF DESIRED)
+	
 	PrimaryRoutine(activeElevators)
 }
 

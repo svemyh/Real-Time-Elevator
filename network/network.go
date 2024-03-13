@@ -102,8 +102,9 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 			id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
 			fmt.Printf("My id: %s\n", id)
 		}
+
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(id, isPrimary, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
@@ -198,9 +199,9 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> TODO: Do something
-			println("OH NO, The conn at line 224 broke")
-			log.Fatal(err)
-			//return err
+			println("OH NO, The conn at line 224 broke1: %e", err)
+			//log.Fatal(err)
+			break
 		}
 
 		// Unmarshal JSON data into a map of elevator states
@@ -208,10 +209,12 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 		err = json.Unmarshal(buf[:n], &assignedHallRequests)
 		if err != nil {
 			//return err
-			println("OH NO, The conn at line 224 broke")
-			log.Fatal(err)
+			println("OH NO, The conn at line 224 broke2: %e", err)
+			//log.Fatal(err)
+			break
 		}
 		FSMAssignedHallRequestsCh <- assignedHallRequests
+		time.Sleep(1 * time.Second)
 	}
 }
 
