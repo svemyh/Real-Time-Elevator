@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -17,7 +18,12 @@ type Backup struct {
 	lastSeen time.Time
 }
 
-func BackupRoutine(conn net.Conn, primaryAddress string) {
+func BackupRoutine(conn net.Conn, primaryAddress string,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool) {
 	BackupActiveElevatorMap := make(map[string]elevator.Elevator)
 	var BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 
@@ -51,6 +57,12 @@ func BackupRoutine(conn net.Conn, primaryAddress string) {
 			fmt.Println("BACKUP recieved disconnectedElevator: ", disconnectedElevator)
 			delete(BackupActiveElevatorMap, disconnectedElevator)
 			TCPSendACK(conn)
+		case <-PrimaryDeadCh:
+			log.Println("Primary confirmed dead")
+			delete(BackupActiveElevatorMap, strings.Split(primaryAddress, ":")[0])
+			time.Sleep(1 * time.Second)
+			BecomePrimary(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+
 		}
 	}
 }
@@ -90,17 +102,21 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 	}
 }
 
-/*
-func BecomePrimary(activeElevator []Elevator) {
+func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
+	BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool) {
 	//TODO: ALl below
 	//establish TCP connection with all elevators last primary had connections with as a client
 	//has to get a TCP conn object with all new elevators to be able to interact in PrimaryRoutine
 	//Needs to run a goroutine TCPReadElevatorStates when connection established
 	//Note, the elevator list will contain your own IP. DO NOT CONNECT TO IT, as PrimaryRoutine will make this connection
 	//(OR HANDLE HERE IF DESIRED)
-	PrimaryRoutine(activeElevators)
+	PrimaryRoutine("id", true, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 }
-*/
 
 func BackupReceiver(ctx context.Context, TCPPort string) {
 
