@@ -185,7 +185,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 	//can send in as empty array first time primary takes over
 
 	for {
-		fmt.Println("\n~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
+		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
 		case stateUpdate := <-StateUpdateCh: //updates if new state is sendt on one of TCP conns, blocks if not
