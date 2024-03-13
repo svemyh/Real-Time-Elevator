@@ -184,6 +184,12 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 	//var ActiveElevators []ActiveElevator // init here or take in as param to func, allows Backup.BecomePrimary to send in prev states
 	//can send in as empty array first time primary takes over
 
+	if len(ActiveElevatorMap) > 0 { // Guarantees that when backup is promoted to primary, that the current active hall requests are redistributed without the necessity of an event occuring (i.e. button pressed, floor arrival, elevator disconnected)
+		StateUpdateCh <- hall_request_assigner.ActiveElevator{
+			Elevator:  ActiveElevatorMap[GetMapKey(ActiveElevatorMap)],
+			MyAddress: GetMapKey(ActiveElevatorMap),
+		}
+	}
 	for {
 		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
@@ -327,6 +333,13 @@ func GetBackupAddress(ActiveElevatorMap map[string]elevator.Elevator) string {
 		}
 	}
 	return "err"
+}
+
+func GetMapKey(ActiveElevatorMap map[string]elevator.Elevator) string {
+	for key := range ActiveElevatorMap {
+		return key
+	}
+	return ""
 }
 
 func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.ActiveElevator) {

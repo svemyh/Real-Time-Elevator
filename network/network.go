@@ -225,7 +225,6 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	fmt.Println("- sendLocalStatesToPrimaryLoop() - Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
-
 	for {
 		select {
 		case stateUpdate := <-FSMStateUpdateCh:

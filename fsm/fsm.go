@@ -149,15 +149,16 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 
 	if f := elevio.GetFloor(); f == -1 {
 		FsmOnInitBetweenFloors()
+	} else {
+		FSMStateUpdateCh <- hall_request_assigner.ActiveElevator{ // Is this the cause of the error "core.exception.AssertError@optimal_hall_requests.d(27): Some elevator is at an invalid floor
+			// i.e. hall_request_assigner.exe does not allow for inputs where an elevator is in the floor "-1"/undefined
+			Elevator:  elevatorState,
+			MyAddress: network.GetLocalIPv4(),
+		}
 	}
-	time.Sleep(500*time.Millisecond) // Make sure FsmOnInitBetweenFloors completes before the rest of FsmRun continues
+	//time.Sleep(500 * time.Millisecond) // Make sure FsmOnInitBetweenFloors completes before the rest of FsmRun continues
 
-	log.Println("firste elev state to send floor! : ", hall_request_assigner.ActiveElevator{Elevator:  elevatorState, MyAddress: network.GetLocalIPv4()}.Elevator.Floor)
-	FSMStateUpdateCh <- hall_request_assigner.ActiveElevator{ // Is this the cause of the error "core.exception.AssertError@optimal_hall_requests.d(27): Some elevator is at an invalid floor
-		// i.e. hall_request_assigner.exe does not allow for inputs where an elevator is in the floor "-1"/undefined
-		Elevator:  elevatorState,
-		MyAddress: network.GetLocalIPv4(),
-	}
+	log.Println("firste elev state to send floor! : ", hall_request_assigner.ActiveElevator{Elevator: elevatorState, MyAddress: network.GetLocalIPv4()}.Elevator.Floor)
 
 	// Polling for new actions/events of the system.
 	for {
@@ -182,7 +183,9 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 				MyAddress: network.GetLocalIPv4(),
 			}
 			toBeSentActiveElevatorState.Elevator.Requests[buttonEvent.Floor][buttonEvent.Button] = true
-			FSMStateUpdateCh <- toBeSentActiveElevatorState // Remember to maybe implement: If the primary-local-fsm-loop takes too long time - each new ButtonEvent from localfsm needs to be ORed at the primary side instead of the Primary simply reading latest command. Danger for overwriting.
+			if elevatorState.Floor != -1 { // Guarantees that FsmOnInitBetweenFloors() is completed before any button-presses are sent.
+				FSMStateUpdateCh <- toBeSentActiveElevatorState
+			}
 
 			if buttonEvent.Button == elevio.ButtonType(elevio.B_Cab) {
 				fmt.Println("I will on this hill")
