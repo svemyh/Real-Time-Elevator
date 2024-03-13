@@ -8,44 +8,51 @@ import (
 )
 
 const (
-	DETECTION_PORT              string = ":10002"
-	TCP_LISTEN_PORT             string = ":10001"
-	TCP_BACKUP_PORT             string = ":15000"
-	TCP_NEW_PRIMARY_LISTEN_PORT string = ":15500"
+	DETECTION_PORT string = ":14272"
+	TCP_LISTEN_PORT string = ":14273"
+	HALL_LIGHTS_PORT string = ":14274"
+	TCP_BACKUP_PORT string = ":14275"
+	TCP_NEW_PRIMARY_LISTEN_PORT = ":14276"
 )
 
 const bufSize = 1024
-const udpInterval = 2 * time.Second
+const udpInterval = 500 * time.Millisecond
 
 type MessageType string
 
 const (
-	TypeActiveElevator MessageType = "ActiveElevator"
-	TypeButtonEvent    MessageType = "ButtonEvent"
-	TypeACK            MessageType = "ACK"
-	TypeString         MessageType = "string"
+	TypeActiveElevator 		 MessageType = "ActiveElevator"
+	TypeButtonEvent    		 MessageType = "ButtonEvent"
+	TypeACK            		 MessageType = "ACK"
+	TypeString         		 MessageType = "string"
+	TypeCombinedHallRequests MessageType = "CombinedHallRequests"
 )
 
 type Message interface{}
 
 type MsgActiveElevator struct {
-	Type    MessageType                          `json:"type"`
-	Content hall_request_assigner.ActiveElevator "json:content"
+	Type    MessageType                          		`json:"type"`
+	Content hall_request_assigner.ActiveElevator 		"json:content"
 }
 
 type MsgButtonEvent struct {
-	Type    MessageType        `json:"type"`
-	Content elevio.ButtonEvent "json:content" // refactor: change Content to antother name? Then go compiler stops complaining
+	Type    MessageType        							`json:"type"`
+	Content elevio.ButtonEvent 							"json:content" // refactor: change Content to antother name? Then go compiler stops complaining
 }
 
 type MsgACK struct {
-	Type    MessageType `json:"type"`
-	Content bool        "json:content"
+	Type    MessageType 								`json:"type"`
+	Content bool        								"json:content"
 }
 
 type MsgString struct {
-	Type    MessageType `json:"type"`
-	Content string      "json:content"
+	Type    MessageType 								`json:"type"`
+	Content string      								"json:content"
+}
+
+type MsgCombinedHallRequests struct {
+	Type    MessageType 								`json:"type"`
+	Content [elevio.N_Floors][elevio.N_Buttons - 1]bool  "json:content"
 }
 
 type ClientUpdate struct {
