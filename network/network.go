@@ -4,6 +4,7 @@ import (
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
+	"elevator/elevator"
 	"fmt"
 	"log"
 	"net"
@@ -104,7 +105,11 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		}
 
 		log.Println("Operating as primary...")
-		go PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+
+		//init empty activeElevMap and CombinedHallReq
+		var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
+		ActiveElevatorMap := make(map[string]elevator.Elevator)
+		go PrimaryRoutine(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
@@ -214,7 +219,6 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 			break
 		}
 		FSMAssignedHallRequestsCh <- assignedHallRequests
-		time.Sleep(1 * time.Second)
 	}
 }
 

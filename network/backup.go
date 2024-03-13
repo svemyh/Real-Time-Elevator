@@ -133,5 +133,5 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 
 	time.Sleep(1500 * time.Millisecond)
 
-	PrimaryRoutine(StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+	PrimaryRoutine(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 }

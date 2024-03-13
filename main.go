@@ -23,17 +23,6 @@ func main() {
 		ObstructionCh:   make(chan bool),
 	}
 
-	/* CLEANUP. Moved to network
-	FSMStateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
-	FSMHallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
-	StateUpdateCh := make(chan hall_request_assigner.ActiveElevator, 1024)
-	HallOrderCompleteCh := make(chan elevio.ButtonEvent, 1024)
-	DisconnectedElevatorCh := make(chan string, 1024)
-	FSMAssignedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
-	AssignHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
-	*/
-	//fsm_terminate := make(chan, bool)
-
 	go elevio.PollFloorSensor(device.FloorSensorCh)
 	go elevio.PollButtons(device.RequestButtonCh)
 	go elevio.PollStopButton(device.StopButtonCh)

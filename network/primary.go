@@ -134,18 +134,23 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 	}
 }
 
-func PrimaryRoutine(StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
+func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
+	CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
 
 	clientTxEnable := make(chan bool)
-	InitActiveElevators := make([]hall_request_assigner.ActiveElevator, 0)
 	clientUpdateCh := make(chan ClientUpdate)
 	helloRx := make(chan ElevatorSystemChannels)
 
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)                                                                                     //Continously broadcast that you are a primary on UDP
 	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
-	go HandlePrimaryTasks(StateUpdateCh, HallOrderCompleteCh, InitActiveElevators, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 
 	for {
 		select {
@@ -167,15 +172,21 @@ func PrimaryRoutine(StateUpdateCh chan hall_request_assigner.ActiveElevator, Hal
 // then if we have other elevators on network then assign hall req for each elevator(by cost) distribute them and button lights
 // if there are other elevators on network then send states to the backup
 
-func HandlePrimaryTasks(StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, ActiveElevators []hall_request_assigner.ActiveElevator, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) {
+func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
+	CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool) {
 	BackupAddr := ""
 	var backupConn net.Conn
 	//var ActiveElevators []ActiveElevator // init here or take in as param to func, allows Backup.BecomePrimary to send in prev states
 	//can send in as empty array first time primary takes over
-	var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
-	ActiveElevatorMap := make(map[string]elevator.Elevator)
 
 	for {
+		fmt.Println("\n~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
+		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
 		case stateUpdate := <-StateUpdateCh: //updates if new state is sendt on one of TCP conns, blocks if not
 			//TODO: compare the state update from single elevator to active elevator array and update activeElevators
