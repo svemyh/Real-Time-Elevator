@@ -58,10 +58,12 @@ func UpdateCombinedHallRequests(ActiveElevatorsMap map[string]elevator.Elevator,
 	return CombinedHallRequests
 }
 
-func UDPBroadCastPrimaryRole(port string, transmitEnable <-chan bool) {
+func UDPBroadCastPrimaryRole(p string, transmitEnable <-chan bool) {
+
+	port := StringPortToInt(p)
 	key := "OptimusPrime"
 
-	conn := conn.DialBroadcastUDP(StringPortToInt(port)) // FIX SO THAT ITS COMPATIBLE WITH STRING
+	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
 
 	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
 	enable := true
@@ -85,7 +87,7 @@ func UDPBroadCastCombinedHallRequests(port string, CombinedHallRequests [elevio.
 	if err != nil {
 		fmt.Println("**Error in UDPBroadCastCombinedHallRequests:", err)
 	}
-	ticker := time.Tick(1 * time.Second)
+	ticker := time.Tick(100 * time.Millisecond)
 
 	for {
 		select { // Blocks until signal recieved on either of these
@@ -165,7 +167,7 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	clientTxEnable := make(chan bool)
 	clientUpdateCh := make(chan ClientUpdate)
 	helloRx := make(chan ElevatorSystemChannels)
-	BroadcastCombinedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool)
+	BroadcastCombinedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
 
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)
 	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                   //Continously broadcast that you are a primary on UDP
@@ -498,6 +500,7 @@ func UDPReadCombinedHallRequests(port string) {
 		default:
 			fmt.Println("Unknown message type recieved")
 		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
