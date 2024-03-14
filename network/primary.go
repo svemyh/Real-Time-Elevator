@@ -535,7 +535,7 @@ func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bo
 		if err != nil {
 			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
 			DisconnectedElevatorCh <- conn.LocalAddr().String()
-			panic(err)
+			break
 		}
 
 		// Decoding said data into a json-style object
