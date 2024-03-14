@@ -54,6 +54,9 @@ func FsmOnRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCo
 		//println("Door Open")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
 			timer.TimerStart(5)
+			fmt.Println("FSM: on a should clear immideatly")
+			fmt.Println("FSM shouldClear: THE ELEVATOR REQ ARE", elevatorState.Requests)
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: btnFloor, Button: elevio.ButtonType(btnType)}
 		} else {
 			elevatorState.Requests[btnFloor][btnType] = true
 		}
