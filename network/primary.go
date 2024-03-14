@@ -130,6 +130,7 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	}
 }
 
+
 func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
@@ -137,7 +138,7 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 
 	ls, err := net.Listen("tcp", TCPPort)
 	if err != nil {
-		fmt.Println("The connection failed. Error:", err)
+		fmt.Println("TCPListenForNewElevators() - The connection failed. Error:", err)
 		return
 	}
 	defer ls.Close()
@@ -149,7 +150,6 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 			fmt.Println("Error: ", err)
 			continue
 		}
-
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
 		go TCPWriteElevatorStates(conn, AssignHallRequestsCh)
 		time.Sleep(1 * time.Second)
@@ -163,6 +163,7 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	AckCh chan bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
+
 	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
 	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
 
@@ -175,19 +176,6 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                   //Continously broadcast that you are a primary on UDP
 	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, BroadcastCombinedHallRequestsCh)
-
-	for {
-		select {
-		case c := <-clientUpdateCh:
-			fmt.Printf("Client update:\n")
-			fmt.Printf("  Clients:    %q\n", c.Client)
-			fmt.Printf("  New:      %q\n", c.New)
-			fmt.Printf("  Lost:     %q\n", c.Lost)
-
-		case a := <-helloRx:
-			fmt.Printf("Received: %#v\n", a)
-		}
-	}
 }
 
 // get new states everytime a local elevator updates their states.
@@ -247,6 +235,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				//This function is only for the backup/primary-communication.
 				CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
 				BroadcastCombinedHallRequestsCh <- CombinedHallRequests
+
 				go func() {
 					select { // Blocks until signal received on either of these
 					case <-AckCh:

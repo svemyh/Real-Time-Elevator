@@ -29,13 +29,14 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 	//TODO: Monitor that primary connection is alive
 	//TODO: Read states sendt through primary connection (make an array to contain -> activeElevators)
 	//TODO: If backup unresponsive --> BecomePrimary(activeElevators). TODO: INIT A BACKUP IN BecomePrimary()
-	fmt.Println("Im a backup, doing backup things")
-	PrimaryDeadCh := make(chan bool)
-	go CheckPrimaryAlive(primaryAddress, PrimaryDeadCh)
+	//fmt.Println("Im a backup, doing backup things")
 
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
 	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
 	BackupDisconnectedElevatorCh := make(chan string)
+	BackupPrimaryDeadCh := make(chan bool)
+
+	go CheckPrimaryAlive(primaryAddress, BackupPrimaryDeadCh)
 
 	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh)
 
@@ -56,19 +57,19 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 			fmt.Println("BACKUP recieved disconnectedElevator: ", disconnectedElevator)
 			delete(BackupActiveElevatorMap, disconnectedElevator)
 			TCPSendACK(conn)
+
 		case <-PrimaryDeadCh:
 			log.Println("Primary confirmed dead")
 			delete(BackupActiveElevatorMap, strings.Split(primaryAddress, ":")[0])
 			time.Sleep(1 * time.Second)
 			BecomePrimary(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
-
 		}
 	}
 }
 
 // Read "I'm the Primary" -message from the Primary(). If no message is recieved after N seconds,
 // then BackupRoutine() can assume Primary is dead -> Promote itself to Primary.
-func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
+func CheckPrimaryAlive(primaryAddress string, BackupPrimaryDeadCh chan bool) {
 	//addr, err := net.ResolveUDPAddr("udp", primaryAddress)
 	//if err != nil {
 	//	log.Printf("-CheckPrimaryAlive() Error resolving UDP address: %v\n", err)
@@ -84,7 +85,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("Timeout reached without receiving %s, backup is becoming primary...", buffer[:n])
-				PrimaryDeadCh <- true
+				BackupPrimaryDeadCh <- true
 				return
 			}
 			log.Printf("Error reading from UDP: %v\n", err)
@@ -103,6 +104,7 @@ func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
 
 func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+
 	StateUpdateCh chan hall_request_assigner.ActiveElevator,
 	HallOrderCompleteCh chan elevio.ButtonEvent,
 	DisconnectedElevatorCh chan string,
@@ -114,8 +116,8 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	//Needs to run a goroutine TCPReadElevatorStates when connection established
 	//Note, the elevator list will contain your own IP. DO NOT CONNECT TO IT, as PrimaryRoutine will make this connection
 	//(OR HANDLE HERE IF DESIRED)
-
 	//TCPDialAsPrimary
+  
 	for ip, _ := range BackupActiveElevatorMap {
 		fmt.Println("Connecting by TCP to the address: ", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
 

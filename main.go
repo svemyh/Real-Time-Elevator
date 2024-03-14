@@ -4,8 +4,6 @@ import (
 	"elevator/elevio"
 	"elevator/fsm"
 	"os"
-
-	//"elevator/hall_request_assigner"
 	"elevator/network"
 	"fmt"
 )
@@ -37,14 +35,12 @@ func main() {
 	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
 	// REFACTOR: Can be moved to InitNetwork()?
 
-	//run local elevator
+
 	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
 	go network.RestartOnReconnect()
 
 	go network.UDPReadCombinedHallRequests(network.HALL_LIGHTS_PORT)
-
-	//establishConnectionWithPrimary() // TCP
 
 	select {}
 
