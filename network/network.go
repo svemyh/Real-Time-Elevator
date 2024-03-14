@@ -132,7 +132,10 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		log.Println("Operating as client...")
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		go TCPListenForNewPrimary(TCP_NEW_PRIMARY_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		conn, _ := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
+		conn, err := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
+		if err != nil {
+			panic(err)
+		}
 		BackupRoutine(conn, primaryAddress+DETECTION_PORT, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 	}
 }
@@ -212,7 +215,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 		if err != nil {
 			// Error means TCP-conn has broken -> TODO: Do something
 			println("OH NO, The conn at line 224 broke1: %e", err)
-			//log.Fatal(err)
+			//panic(err)
 			break
 		}
 
@@ -222,7 +225,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 		if err != nil {
 			//return err
 			println("OH NO, The conn at line 224 broke2: %e", err)
-			//log.Fatal(err)
+			//panic(err)
 			break
 		}
 		FSMAssignedHallRequestsCh <- assignedHallRequests
@@ -323,21 +326,23 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		if err != nil {
 			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
 			DisconnectedElevatorCh <- conn.LocalAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
-			log.Fatal(err)
+			break
+			//conn.Close()
+			//panic(err)
 		}
 
 		// Decoding said data into a json-style object
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
 			fmt.Println("Error unmarshaling generic message: ", err)
-			log.Fatal(err)
+			panic(err)
 		}
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
 		switch MessageType(genericMsg["type"].(string)) {
 		case TypeActiveElevator:
 			var msg MsgActiveElevator
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				log.Fatal(err)
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
 			fmt.Printf("Received ActiveElevator object: %+v\n", msg)
 			StateUpdateCh <- msg.Content
@@ -345,14 +350,14 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		case TypeButtonEvent:
 			var msg MsgButtonEvent
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				log.Fatal(err)
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
 			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
 			HallOrderCompleteCh <- msg.Content
 		case TypeString:
 			var msg MsgString
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				log.Fatal(err)
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
 			fmt.Printf("Received string object: %+v\n", msg)
 			DisconnectedElevatorCh <- msg.Content
@@ -380,18 +385,18 @@ func TCPDialBackup(address string, port string) net.Conn {
 func StartClient(port string, msg Message) {
 	conn, err := net.Dial("tcp", "localhost"+port)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	defer conn.Close()
 
 	data, err := json.Marshal(msg)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	_, err = conn.Write(data)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }
 
@@ -489,7 +494,7 @@ func RestartOnReconnect() {
 func GetLocalIPv4() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	defer conn.Close()
 
@@ -501,7 +506,9 @@ func GetLocalIPv4() string {
 func StringPortToInt(port string) int {
 	portWithoutColon := strings.TrimPrefix(port, ":")
 
-	portInt, _ := strconv.Atoi(portWithoutColon)
-
+	portInt, err := strconv.Atoi(portWithoutColon)
+	if err != nil {
+		panic(err)
+	}
 	return portInt
 }

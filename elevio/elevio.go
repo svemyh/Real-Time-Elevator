@@ -39,7 +39,8 @@ func Init(addr string, numFloors int) {
 	var err error
 	_conn, err = net.Dial("tcp", addr)
 	if err != nil {
-		panic(err.Error())
+		fmt.Println("this is fine")
+		//panic(err.Error())
 	}
 	_initialized = true
 }

@@ -65,7 +65,10 @@ func UDPBroadCastPrimaryRole(p string, transmitEnable <-chan bool) {
 
 	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
 
-	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
+	if err != nil {
+		panic(err)
+	}
 	enable := true
 	for {
 
@@ -87,7 +90,7 @@ func UDPBroadCastCombinedHallRequests(port string, CombinedHallRequests [elevio.
 	if err != nil {
 		fmt.Println("**Error in UDPBroadCastCombinedHallRequests:", err)
 	}
-	ticker := time.Tick(100 * time.Millisecond)
+	ticker := time.Tick(200 * time.Millisecond)
 
 	for {
 		select { // Blocks until signal recieved on either of these
@@ -108,7 +111,6 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	for {
 		buffer := make([]byte, bufSize)
 		n, addr, err := conn.ReadFrom(buffer)
-
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("Timeout reached without receiving %s, becoming primary...", buffer[:n])
@@ -258,9 +260,9 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			}
 
 			// For test purposes
-			CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
-			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
-			AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+			//CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
+			//BroadcastCombinedHallRequestsCh <- CombinedHallRequests
+			//AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 
 			//if len(ActiveElevators) > 1 {
 			//TODO: assign  new backup if needed based based on state update.
@@ -479,13 +481,14 @@ func UDPReadCombinedHallRequests(port string) {
 		var buf [bufSize]byte
 		n, _, err := conn.ReadFrom(buf[:])
 		if err != nil {
+			fmt.Println("Error reading from connection: ", err)
 			continue
 		}
 
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
 			fmt.Println("Error unmarshaling generic message: ", err)
-			log.Fatal(err)
+			panic(err)
 		}
 
 		switch MessageType(genericMsg["type"].(string)) {
@@ -532,21 +535,21 @@ func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bo
 		if err != nil {
 			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
 			DisconnectedElevatorCh <- conn.LocalAddr().String()
-			log.Fatal(err)
+			panic(err)
 		}
 
 		// Decoding said data into a json-style object
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
 			fmt.Println("Error unmarshaling generic message: ", err)
-			log.Fatal(err)
+			panic(err)
 		}
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
 		switch MessageType(genericMsg["type"].(string)) {
 		case TypeACK:
 			var msg MsgACK
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				log.Fatal(err)
+				panic(err)
 			}
 			AckCh <- msg.Content
 
