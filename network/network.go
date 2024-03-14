@@ -478,7 +478,6 @@ func RestartOnReconnect() {
 	prevWasConnected := ConnectedToNetwork()
 	for {
 		if (ConnectedToNetwork()) && (prevWasConnected == false) {
-			fmt.Println("restarting stuffs:")
 			exec.Command("gnome-terminal", "--", "go", "run", "./main.go").Run()
 			panic("No network connection. Terminating current run - restarting from restart.go")
 		}
@@ -487,14 +486,16 @@ func RestartOnReconnect() {
 		} else {
 			prevWasConnected = false
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Millisecond)
+		// Sleep(1 second) was here, should it remain? - 14.03 22:04 - Sveinung og Mikael
 	}
 }
 
 func GetLocalIPv4() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		panic(err)
+		fmt.Println("Error fetching local IPv4 address: ", err)
+		return ""
 	}
 	defer conn.Close()
 
