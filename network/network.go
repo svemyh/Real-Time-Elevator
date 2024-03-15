@@ -160,6 +160,7 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 			fmt.Println("Error: ", err)
 			continue
 		}
+		fmt.Println("TCPListenForNewPrimary() - Connection established from ", conn.RemoteAddr().String(), " to ", conn.LocalAddr().String())
 
 		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
 		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
@@ -210,6 +211,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 	defer conn.Close()
 
 	for {
+		time.Sleep(50 * time.Millisecond)
 		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
@@ -236,6 +238,7 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 	fmt.Println("- sendLocalStatesToPrimaryLoop() - Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
 	for {
+		time.Sleep(50 * time.Millisecond)
 		select {
 		case stateUpdate := <-FSMStateUpdateCh:
 			/*
