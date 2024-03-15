@@ -140,8 +140,29 @@ func FsmOnDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh 
 	//fmt.Printf("-------------------------------")
 	//fmt.Printf("\nNew state:\n")
 }
+func checkStuck(EB_StuckCh chan bool, FloorSensorCh chan int) {
+	//var lastFloor int
+	var lastTime time.Time
+	stuckDuration := 2 * time.Second
+	go func() {
+		for {
+			select {
+			case <-FloorSensorCh:
+				lastTime = time.Now()
+				EB_StuckCh <- false
+				log.Println("IM NOT STUCK- -------")
 
-func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool, InitCabCopy [elevio.N_Floors]bool) {
+			case <-time.After(stuckDuration):
+				if time.Since(lastTime) >= stuckDuration {
+					EB_StuckCh <- true
+					log.Println("IM STUCK- -------")
+				}
+			}
+		}
+	}()
+}
+
+func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool, InitCabCopy [elevio.N_Floors]bool, EB_StuckCh chan bool) {
 
 	//elevatorState = elevator.ElevatorInit()
 	var prev int = -1
@@ -169,6 +190,8 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 
 	// Polling for new actions/events of the system.
 	for {
+		checkStuck(EB_StuckCh, device.FloorSensorCh)
+
 		select {
 		case floor := <-device.FloorSensorCh:
 			//fmt.Println("Floor Sensor:", floor)

@@ -24,6 +24,7 @@ func main() {
 
 	Channels := network.NewElevatorSystemChannels()
 	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool) //no buffer in order to make sending blockig
+	EB_StuckCh := make(chan bool)
 
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int),
@@ -41,7 +42,7 @@ func main() {
 	// REFACTOR: Can be moved to InitNetwork()?
 
 	//run local elevator
-	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
+	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy, EB_StuckCh) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
 	go network.RestartOnReconnect(CabCopyCh)
 
