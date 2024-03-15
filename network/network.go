@@ -321,7 +321,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	defer conn.Close()
 
 	for {
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 		// Create buffer and read data into the buffer using conn.Read()
 		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
