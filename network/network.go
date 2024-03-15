@@ -474,20 +474,41 @@ func ConnectedToNetwork() bool {
 	return true
 }
 
-func RestartOnReconnect() {
+func RestartOnReconnect(CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) {
+	var CabCopy [elevio.N_Floors]bool
 	prevWasConnected := ConnectedToNetwork()
+
 	for {
-		if (ConnectedToNetwork()) && (prevWasConnected == false) {
-			exec.Command("gnome-terminal", "--", "go", "run", "./main.go").Run()
-			panic("No network connection. Terminating current run - restarting from restart.go")
-		}
-		if ConnectedToNetwork() {
-			prevWasConnected = true
-		} else {
-			prevWasConnected = false
+		select {
+		case requestCopy := <-CabCopyCh:
+			for floor := 0; floor < elevio.N_Floors; floor++ {
+				CabCopy[floor] = requestCopy[floor][elevio.B_Cab]
+			}
+
+			fmt.Println("copy cab is: ", elevio.CabArrayToString(CabCopy))
+		default:
+			if ConnectedToNetwork() && !prevWasConnected {
+				cabString := elevio.CabArrayToString(CabCopy)
+
+				command := fmt.Sprintf("gnome-terminal -- go run ./main.go %s", cabString)
+
+				cmd := exec.Command("bash", "-c", command)
+
+				err := cmd.Run()
+				if err != nil {
+					fmt.Println("Failed to execute command:", err)
+				}
+				fmt.Println("copy cab is: ", elevio.CabArrayToString(CabCopy))
+				panic("No network connection. Terminating current run - restarting from restart.go")
+			}
+			if ConnectedToNetwork() {
+				prevWasConnected = true
+			} else {
+				prevWasConnected = false
+			}
+			// Sleep(1 second) was here, should it remain? - 14.03 22:04 - Sveinung og Mikael
 		}
 		time.Sleep(1 * time.Millisecond)
-		// Sleep(1 second) was here, should it remain? - 14.03 22:04 - Sveinung og Mikael
 	}
 }
 
