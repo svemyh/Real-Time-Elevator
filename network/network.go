@@ -214,7 +214,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> TODO: Do something
-			println("OH NO, The conn at line 224 broke1: %e", err)
+			println("OH NO, The conn at line 217 broke1: %e", err)
 			//panic(err)
 			break
 		}
@@ -320,12 +320,14 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	defer conn.Close()
 
 	for {
+		time.Sleep(50 * time.Millisecond)
 		// Create buffer and read data into the buffer using conn.Read()
 		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
 			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
-			DisconnectedElevatorCh <- conn.LocalAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
+			fmt.Println("TCPReadElevatorStates() - Error reading from connection", err)
+			DisconnectedElevatorCh <- conn.RemoteAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
 			break
 			//conn.Close()
 			//panic(err)
@@ -334,15 +336,19 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		// Decoding said data into a json-style object
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
-			fmt.Println("Error unmarshaling generic message: ", err)
-			panic(err)
+			fmt.Println("TCPReadElevatorStates() - Error unmarshaling generic message: ", err)
+			fmt.Println("Content of faulty generic message:", genericMsg)
+			DisconnectedElevatorCh <- conn.RemoteAddr().String()
 		}
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
 		switch MessageType(genericMsg["type"].(string)) {
 		case TypeActiveElevator:
 			var msg MsgActiveElevator
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				//panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				fmt.Println("TCPReadElevatorStates() - Error unmarshaling MsgActiveElevator message: ", err)
+				fmt.Println("Content of faulty TypeActiveElevator message:", msg)
+				DisconnectedElevatorCh <- conn.RemoteAddr().String()
 			}
 			fmt.Printf("Received ActiveElevator object: %+v\n", msg)
 			StateUpdateCh <- msg.Content
@@ -350,14 +356,20 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		case TypeButtonEvent:
 			var msg MsgButtonEvent
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				//panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				fmt.Println("TCPReadElevatorStates() - Error unmarshaling MsgButtonEvent message: ", err)
+				fmt.Println("Content of faulty TypeButtonEvent message:", msg)
+				DisconnectedElevatorCh <- conn.RemoteAddr().String()
 			}
 			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
 			HallOrderCompleteCh <- msg.Content
 		case TypeString:
 			var msg MsgString
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				//panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				fmt.Println("TCPReadElevatorStates() - Error unmarshaling MsgString message: ", err)
+				fmt.Println("Content of faulty TypeString message:", msg)
+				DisconnectedElevatorCh <- conn.RemoteAddr().String()
 			}
 			fmt.Printf("Received string object: %+v\n", msg)
 			DisconnectedElevatorCh <- msg.Content
@@ -365,7 +377,6 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		default:
 			fmt.Println("Unknown message type")
 		}
-		time.Sleep(20 * time.Millisecond)
 	}
 }
 
@@ -400,71 +411,6 @@ func StartClient(port string, msg Message) {
 		panic(err)
 	}
 }
-
-/*
-func TCPListenForNewPrimary() {
-	//listen for new primary on tcp port and accept
-}
-
-func TCPListenForNewElevators(port string, listenerconnection, receiverchannels){
-	//listen for new elevators on TCP port
-	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
-	go run TCPReadElevatorStates(stateUpdateCh)
-
-	allClients := make(map[net.Conn]string)
-	newConnections := make(chan net.Conn)
-	deadConnections := make(chan net.Conn)
-	messages := make(chan connectionMsg)
-
-	go acceptConnections(connection, newConnections)
-
-	for {
-		select {
-		case conn := <-newConnections:
-			addr := conn.RemoteAddr().String()
-			fmt.Printf("Accepted new client, %v\n", addr)
-			allClients[conn] = addr
-			go read(conn, messages, deadConnections)
-
-		case conn := <-deadConnections:
-			fmt.Printf("Client %v disconnected", allClients[conn])
-			delete(allClients, conn)
-
-		case message := <-messages:
-			go decodeMsg(message, rxChannels)
-		}
-	}
-}
-
-func acceptConnections(server net.Listener, newConnections chan net.Conn) {
-	for {
-		conn, err := server.Accept()
-		if err != nil {
-			fmt.Println(err)
-		}
-		newConnections <- conn
-	}
-}
-*/
-
-/*
-distribute all hall requests
-needs to receive ack from each elevator sendt to.
-probably need to give it the TCP conn array
-
-func DistributeHallRequests(assignedHallReq) {
-	//TODO: all
-}
-
-
-distribute all button lights assosiated with each hallreq at each local elevator
-needs to receive ack from each elevator sendt to.
-probably need to give it the TCP conn array.
-will need ack here aswell as hall req button lights need to be syncronized across computers
-func DistributeHallButtonLights(assignedHallReq) {
-	//TODO: all
-}
-*/
 
 func ConnectedToNetwork() bool {
 	conn, err := net.Dial("udp", "8.8.8.8:53") // (8.8.8.8 is a Google DNS)
