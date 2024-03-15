@@ -243,6 +243,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
+						DisconnectedElevatorCh <- BackupAddr
 					}
 				}()
 			}
@@ -267,12 +268,14 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case completedOrder")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
+						DisconnectedElevatorCh <- BackupAddr
 					}
 				}()
 			}
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			fmt.Println("In case DisconnectedElevatorCh, recieved disconnectedElevator: ", disconnectedElevator)
+			fmt.Println("In case DisconnectedElevatorCh, formatted disconnectedElevator: ", strings.Split(disconnectedElevator, ":")[0])
 			delete(ActiveElevatorMap, strings.Split(disconnectedElevator, ":")[0])
 
 			// TODO: if disconnectedElevator == backupElevator DO: initialize a new Backup
@@ -293,6 +296,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
+						DisconnectedElevatorCh <- BackupAddr
 					}
 				}()
 			}
