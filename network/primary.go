@@ -452,7 +452,7 @@ func UDPReadCombinedHallRequests(port string) {
 			fmt.Println("Content of faulty generic message:", genericMsg)
 		}
 
-		switch MessageType(genericMsg["type"].(string)) {
+		switch MessageType(genericMsg["type"].String()) {
 		case TypeCombinedHallRequests:
 			var msg MsgCombinedHallRequests
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
@@ -507,7 +507,7 @@ func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bo
 			DisconnectedElevatorCh <- conn.RemoteAddr().String()
 		}
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
-		switch MessageType(genericMsg["type"].(string)) {
+		switch MessageType(genericMsg["type"].String()) {
 		case TypeACK:
 			var msg MsgACK
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {

@@ -23,7 +23,7 @@ func main() {
 	fmt.Println("The cab copy is: ", InitCabCopy)
 
 	Channels := network.NewElevatorSystemChannels()
-	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool) //no buffer in order to make sending blockig
+	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool,1024) //no buffer in order to make sending blockig
 
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int),
