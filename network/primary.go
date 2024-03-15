@@ -524,7 +524,7 @@ func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bo
 	// type StateUpdateCh = IP + elevatorStates
 	// type HallOrderCopleteCh = floor number (of cab call completed)
 
-	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("TCPReadACK() - *New connection accepted from address: %s\n", conn.RemoteAddr())
 
 	defer conn.Close()
 

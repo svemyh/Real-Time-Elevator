@@ -205,7 +205,7 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 }
 
 func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) { // NOT TESTED!
-	fmt.Printf("RecieveAssignedHallRequests() - *New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("RecieveAssignedHallRequests() - *New connection accepted from address: %s\n", conn.RemoteAddr())
 
 	defer conn.Close()
 
@@ -315,7 +315,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	// type StateUpdateCh = IP + elevatorStates
 	// type HallOrderCopleteCh = floor number (of cab call completed)
 
-	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.RemoteAddr())
 
 	defer conn.Close()
 
@@ -365,6 +365,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		default:
 			fmt.Println("Unknown message type")
 		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 
