@@ -342,7 +342,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			DisconnectedElevatorCh <- conn.RemoteAddr().String()
 		}
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
-		switch MessageType(genericMsg["type"].String()) {
+		switch MessageType(genericMsg["type"].(string)) {
 		case TypeActiveElevator:
 			var msg MsgActiveElevator
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
