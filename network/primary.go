@@ -272,7 +272,8 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			}
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
-			delete(ActiveElevatorMap, disconnectedElevator)
+			fmt.Println("In case DisconnectedElevatorCh, recieved disconnectedElevator: ", disconnectedElevator)
+			delete(ActiveElevatorMap, strings.Split(disconnectedElevator, ":")[0])
 
 			// TODO: if disconnectedElevator == backupElevator DO: initialize a new Backup
 			if len(ActiveElevatorMap) >= 2 {
@@ -287,7 +288,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				go func() { // wait for ACK
 					select { // Blocks until signal received on either of these
 					case <-AckCh:
-						fmt.Println("ACK received: In case stateUpdate")
+						fmt.Println("ACK received: In case disconnectedElevator")
 						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")

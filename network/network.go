@@ -455,7 +455,7 @@ func RestartOnReconnect(CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) 
 			}
 			// Sleep(1 second) was here, should it remain? - 14.03 22:04 - Sveinung og Mikael
 		}
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(100 * time.Microsecond)
 	}
 }
 
