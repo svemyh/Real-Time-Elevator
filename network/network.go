@@ -205,7 +205,7 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 }
 
 func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) { // NOT TESTED!
-	fmt.Printf("RecieveAssignedHallRequests() - *New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("RecieveAssignedHallRequests() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
 
 	defer conn.Close()
 
@@ -229,11 +229,13 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 			break
 		}
 		FSMAssignedHallRequestsCh <- assignedHallRequests
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
 func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
-	fmt.Println("- sendLocalStatesToPrimaryLoop() - Conection established to: ", conn.RemoteAddr())
+	fmt.Printf("sendLocalStatesToPrimaryLoop() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
+
 	defer conn.Close()
 	for {
 		select {
@@ -279,6 +281,7 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 			}
 			time.Sleep(50 * time.Millisecond)
 		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -316,6 +319,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	// type HallOrderCopleteCh = floor number (of cab call completed)
 
 	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
 
 	defer conn.Close()
 

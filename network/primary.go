@@ -312,6 +312,8 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			//ssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
+			fmt.Println("In case disconnectedElevator: recieved:", disconnectedElevator)
+			fmt.Println("In case disconnectedElevator:formatted:", strings.Split(disconnectedElevator, ":")[0])
 			delete(ActiveElevatorMap, disconnectedElevator)
 
 			// TODO: Implement TCPSendDisconnectedElevator(disconnectedElevator) // Backup also needs this information
@@ -524,7 +526,8 @@ func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bo
 	// type StateUpdateCh = IP + elevatorStates
 	// type HallOrderCopleteCh = floor number (of cab call completed)
 
-	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("TCPReadACK() - *New connection accepted from address: %s\n", conn.LocalAddr())
+	fmt.Printf("TCPReadACK() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
 
 	defer conn.Close()
 
@@ -556,5 +559,6 @@ func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bo
 		default:
 			fmt.Println("Unknown message type")
 		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
