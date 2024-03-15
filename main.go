@@ -6,9 +6,11 @@ import (
 	"elevator/network"
 	"fmt"
 	"os"
+	"time"
 )
 
 func main() {
+	time.Sleep(4 * time.Second)
 	//just to enable running multiple elev server from same computer by doing go run main() port
 	//"15657" default port for elev server
 	var InitCabCopy [elevio.N_Floors]bool
