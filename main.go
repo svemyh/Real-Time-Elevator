@@ -4,8 +4,6 @@ import (
 	"elevator/elevio"
 	"elevator/fsm"
 	"os"
-
-	//"elevator/hall_request_assigner"
 	"elevator/network"
 	"fmt"
 )
@@ -13,9 +11,9 @@ import (
 func main() {
 	//just to enable running multiple elev server from same computer by doing go run main() port
 	//"15657" default port for elev server
-	var CabCopy []bool
+	var CabCopy [elevio.N_Floors]bool
 	if len(os.Args) == 2 {
-		CabCopy, _ = elevio.StringToCabArray(os.Args[1])
+		CabCopy = elevio.StringToCabArray(os.Args[1])
 	}
 	elevio.Init("localhost:14235", elevio.N_Floors)
 

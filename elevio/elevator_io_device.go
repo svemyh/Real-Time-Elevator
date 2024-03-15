@@ -1,7 +1,6 @@
 package elevio
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -81,22 +80,20 @@ func ButtonToString(b Button) string {
 	}
 }
 
-func StringToCabArray(input string) ([]bool, error) {
-	var cabArray []bool
+func StringToCabArray(input string) [N_Floors]bool {
+	var cabArray [N_Floors]bool
 	parts := strings.Split(input, ",")
-	for _, part := range parts {
+	for i, part := range parts {
 		if part == "true" {
-			cabArray = append(cabArray, true)
-		} else if part == "false" {
-			cabArray = append(cabArray, false)
+			cabArray[i] = true
 		} else {
-			return nil, fmt.Errorf("invalid boolean value: %s", part)
+			cabArray[i] = false
 		}
 	}
-	return cabArray, nil
+	return cabArray
 }
 
-func CabArrayToString(input []bool) string {
+func CabArrayToString(input [N_Floors]bool) string {
 	var strArr []string
 	for _, b := range input {
 		strArr = append(strArr, strconv.FormatBool(b))
