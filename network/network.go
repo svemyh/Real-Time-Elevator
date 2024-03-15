@@ -474,14 +474,17 @@ func ConnectedToNetwork() bool {
 	return true
 }
 
-func RestartOnReconnect(CabCopyCh chan elevio.ButtonEvent) {
+func RestartOnReconnect(CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) {
 	var CabCopy [elevio.N_Floors]bool
 	prevWasConnected := ConnectedToNetwork()
 
 	for {
 		select {
-		case cabBtn := <-CabCopyCh:
-			CabCopy[cabBtn.Floor] = true
+		case requestCopy := <-CabCopyCh:
+			for floor := 0; floor < elevio.N_Floors; floor++ {
+				CabCopy[floor] = requestCopy[floor][elevio.B_Cab]
+			}
+
 			fmt.Println("copy cab is: ", elevio.CabArrayToString(CabCopy))
 		default:
 			if ConnectedToNetwork() && !prevWasConnected {
@@ -490,7 +493,7 @@ func RestartOnReconnect(CabCopyCh chan elevio.ButtonEvent) {
 				command := fmt.Sprintf("gnome-terminal -- go run ./main.go %s", cabString)
 
 				cmd := exec.Command("bash", "-c", command)
-			
+
 				err := cmd.Run()
 				if err != nil {
 					fmt.Println("Failed to execute command:", err)

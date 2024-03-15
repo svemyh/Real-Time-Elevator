@@ -98,7 +98,7 @@ func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
-func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) elevator.Elevator { // not finished
+func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) elevator.Elevator { // not finished
 	// Implement logic based on e.Config.ClearRequestVariant
 	// Update e.Requests accordingly
 
@@ -136,5 +136,6 @@ func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio
 			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
 		}
 	}
+	CabCopyCh <- e.Requests
 	return e
 }
