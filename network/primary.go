@@ -275,6 +275,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			fmt.Println("In case DisconnectedElevatorCh, recieved disconnectedElevator: ", disconnectedElevator)
+			fmt.Println("In case DisconnectedElevatorCh, Formatted disconnectedElevator: ", strings.Split(disconnectedElevator, ":")[0])
 			delete(ActiveElevatorMap, strings.Split(disconnectedElevator, ":")[0])
 
 			// TODO: if disconnectedElevator == backupElevator DO: initialize a new Backup
