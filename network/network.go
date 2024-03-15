@@ -210,6 +210,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 	defer conn.Close()
 
 	for {
+		time.Sleep(100 * time.Millisecond)
 		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
