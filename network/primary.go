@@ -314,7 +314,8 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			fmt.Println("In case disconnectedElevator: recieved:", disconnectedElevator)
 			fmt.Println("In case disconnectedElevator:formatted:", strings.Split(disconnectedElevator, ":")[0])
-			delete(ActiveElevatorMap, disconnectedElevator)
+			delete(ActiveElevatorMap, strings.Split(disconnectedElevator, ":")[0])
+			fmt.Println("after removing elevator, active elev map is: ", ActiveElevatorMap)
 
 			// TODO: Implement TCPSendDisconnectedElevator(disconnectedElevator) // Backup also needs this information
 			// WaitForAcknowledgment(AckCh)
