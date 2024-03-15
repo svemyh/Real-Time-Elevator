@@ -1,5 +1,10 @@
 package elevio
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // Incomplete
 // func ElevGetInputDevice() ElevInputDevice {
@@ -76,4 +81,25 @@ func ButtonToString(b Button) string {
 	}
 }
 
+func StringToCabArray(input string) ([]bool, error) {
+	var cabArray []bool
+	parts := strings.Split(input, ",")
+	for _, part := range parts {
+		if part == "true" {
+			cabArray = append(cabArray, true)
+		} else if part == "false" {
+			cabArray = append(cabArray, false)
+		} else {
+			return nil, fmt.Errorf("invalid boolean value: %s", part)
+		}
+	}
+	return cabArray, nil
+}
 
+func CabArrayToString(input []bool) string {
+	var strArr []string
+	for _, b := range input {
+		strArr = append(strArr, strconv.FormatBool(b))
+	}
+	return strings.Join(strArr, ",")
+}

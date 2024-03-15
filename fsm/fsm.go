@@ -142,7 +142,7 @@ func FsmOnDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
 	//fmt.Printf("\nNew state:\n")
 }
 
-func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, CabCopyCh chan elevio.ButtonEvent) {
 
 	//elevatorState = elevator.ElevatorInit()
 	var prev int = -1
@@ -189,7 +189,8 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 			}
 
 			if buttonEvent.Button == elevio.ButtonType(elevio.B_Cab) {
-				fmt.Println("I will on this hill")
+				fmt.Println("Cab press detected")
+				CabCopyCh <- buttonEvent
 				FsmOnRequestButtonPress(buttonEvent.Floor, elevio.Button(buttonEvent.Button), FSMHallOrderCompleteCh)
 			}
 

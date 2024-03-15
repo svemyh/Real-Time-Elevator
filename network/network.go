@@ -474,11 +474,18 @@ func ConnectedToNetwork() bool {
 	return true
 }
 
-func RestartOnReconnect() {
+func RestartOnReconnect(CabCopyCh chan elevio.ButtonEvent) {
+	var CabCopy []bool
 	prevWasConnected := ConnectedToNetwork()
+
 	for {
-		if (ConnectedToNetwork()) && (prevWasConnected == false) {
-			exec.Command("gnome-terminal", "--", "go", "run", "./main.go").Run()
+		select {
+		case cabBtn := <- CabCopyCh:
+			CabCopy[cabBtn.Floor] = true
+
+		default:
+		if (ConnectedToNetwork() && !prevWasConnected) {
+			exec.Command("gnome-terminal", "--", "go", "run", "./main.go", " ", elevio.CabArrayToString(CabCopy)).Run()
 			panic("No network connection. Terminating current run - restarting from restart.go")
 		}
 		if ConnectedToNetwork() {
@@ -486,8 +493,9 @@ func RestartOnReconnect() {
 		} else {
 			prevWasConnected = false
 		}
-		time.Sleep(1 * time.Millisecond)
 		// Sleep(1 second) was here, should it remain? - 14.03 22:04 - Sveinung og Mikael
+	}
+	time.Sleep(1 * time.Millisecond)
 	}
 }
 
