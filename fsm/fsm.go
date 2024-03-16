@@ -14,8 +14,11 @@ import (
 
 // var outputDevice elevio.ElevOutputDevice // Not necessary on Go only in C?
 
-var elevatorState elevator.Elevator
-var isDoorOpen bool
+var (
+	elevatorState elevator.Elevator
+ 	isDoorOpen bool
+	doorOpenDurationS int64 = elevatorState.Config.DoorOpenDurationS
+)
 
 func init() {
 	elevatorState = elevator.ElevatorInit()
@@ -34,14 +37,11 @@ func handleInitBetweenFloors() {
 }
 
 func handleRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) {
-	//fmt.Printf("\n\n%s(%d, %s)\n", "FsmOnRequestButtonPress", btnFloor, elevio.ButtonToString(btnType))
-	//elevatorPrint(elevator)
-
 	switch elevatorState.Behaviour {
 	case elevator.EB_DoorOpen:
 		//println("Door Open")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
-			timer.DoorTimerStart(5)
+			timer.DoorTimerStart(doorOpenDurationS)
 			if btnType != elevio.B_Cab { // FSMHallOrderCompleteCh only accepts
 				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: btnFloor, Button: elevio.ButtonType(btnType)}
 			}
@@ -61,7 +61,7 @@ func handleRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderC
 		case elevator.EB_DoorOpen:
 			elevio.SetDoorOpenLamp(true)
 			isDoorOpen = true
-			timer.DoorTimerStart(5)
+			timer.DoorTimerStart(doorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 
 		case elevator.EB_Moving:
@@ -69,12 +69,10 @@ func handleRequestButtonPress(btnFloor int, btnType elevio.Button, FSMHallOrderC
 			//fmt.Println("Elevator state moving dirn", elevatorState.Dirn)
 
 		case elevator.EB_Idle:
-			//fmt.Println("EB_Idle")
 		}
 	}
 	CabCopyCh <- elevatorState.Requests
 	setAllCabLights()
-	//fmt.Println("\nNew state:")
 }
 
 func handleFloorArrival(newFloor int, FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) {
@@ -90,15 +88,13 @@ func handleFloorArrival(newFloor int, FSMHallOrderCompleteCh chan elevio.ButtonE
 			elevio.SetDoorOpenLamp(true)
 			isDoorOpen = true
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
-			timer.DoorTimerStart(elevatorState.Config.DoorOpenDurationS)
+			timer.DoorTimerStart(doorOpenDurationS)
 			setAllCabLights()
 			elevatorState.Behaviour = elevator.EB_DoorOpen
 		}
 	default:
 		break
 	}
-	//fmt.Printf("\nNew state:\n")
-
 }
 
 func handleDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) {
@@ -109,18 +105,15 @@ func handleDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
-			//fmt.Println("EB Door Open")
-			timer.DoorTimerStart(elevatorState.Config.DoorOpenDurationS)
+			timer.DoorTimerStart(doorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 			setAllCabLights()
 		case elevator.EB_Moving:
-			//fmt.Println("EB moving")
 			elevio.SetDoorOpenLamp(false)
 			isDoorOpen = false
 			elevio.SetMotorDirection(elevatorState.Dirn)
 
 		case elevator.EB_Idle:
-			//fmt.Println("EB idle")
 			elevio.SetDoorOpenLamp(false)
 			isDoorOpen = false
 			elevio.SetMotorDirection(elevio.D_Stop)
@@ -129,8 +122,6 @@ func handleDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh
 	default:
 		break
 	}
-	//fmt.Printf("-------------------------------")
-	//fmt.Printf("\nNew state:\n")
 }
 
 func checkStuck(EB_StuckCh chan bool) {
@@ -171,8 +162,6 @@ func checkStuck(EB_StuckCh chan bool) {
 }
 
 func FSMRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool, InitCabCopy [elevio.N_Floors]bool, EB_StuckCh chan bool) {
-
-	//elevatorState = elevator.ElevatorInit()
 	var prev int = -1
 	log.Println("is in fsm")
 
@@ -256,12 +245,12 @@ func FSMRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 				time.Sleep(500 * time.Millisecond)
 			}
 
-		case AssignedHallRequests := <-FSMAssignedHallRequestsCh:
+		case assignedHallRequests := <-FSMAssignedHallRequestsCh:
 
 			for i := 0; i < elevio.N_Floors; i++ {
 				for j := 0; j < 2; j++ {
 					elevatorState.Requests[i][j] = false
-					if AssignedHallRequests[i][j] {
+					if assignedHallRequests[i][j] {
 						handleRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh, CabCopyCh)
 						time.Sleep(100 * time.Millisecond)
 					}
