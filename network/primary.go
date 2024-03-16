@@ -130,19 +130,19 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	}
 }
 
-func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
-	//listen for new elevators on TCP port
-	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
-	//go TCPReadElevatorStates(stateUpdateCh)
-
+func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	ls, err := net.Listen("tcp", TCPPort)
 	if err != nil {
 		fmt.Println("The connection failed. Error:", err)
 		return
 	}
 	defer ls.Close()
-
 	fmt.Println("Primary is listening for new connections to port:", TCPPort)
+
+	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
+	ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+	go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
+
 	for {
 		conn, err := ls.Accept()
 		if err != nil {
@@ -150,9 +150,12 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 			continue
 		}
 
+		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+		ConsumerChannels[conn] = personalAssignedHallRequestsCh
+		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
+
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
-		go TCPWriteElevatorStates(conn, AssignHallRequestsCh)
-		time.Sleep(1 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 

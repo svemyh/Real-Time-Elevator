@@ -289,11 +289,11 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 //receiverChan := make(chan string)
 //go network.Reciever(receiverChan, "localhost:20013")
 
-func TCPWriteElevatorStates(conn net.Conn, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	defer conn.Close()
 
 	for {
-		assignedHallRequests := <-AssignedHallRequestsCh
+		assignedHallRequests := <-personalAssignedHallRequestsCh
 		data, err := json.Marshal(assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
 		if err != nil {
 			fmt.Println("Error encoding hallRequests to json: ", err)
@@ -311,6 +311,15 @@ func TCPWriteElevatorStates(conn net.Conn, AssignedHallRequestsCh chan map[strin
 		fmt.Println("assigned hall req to thsi conn:: ", assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
 		fmt.Println("conn that is sending: ", conn.RemoteAddr().String())
 		fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
+	}
+}
+
+// Recieves message on AssignedHallRequestsCh and distributes said message to all consumer go-routines ConsumerAssignedHallRequestsCh
+func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, Consumers map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	for hallRequests := range AssignedHallRequestsCh {
+		for _, ch := range Consumers {
+			ch <- hallRequests
+		}
 	}
 }
 
