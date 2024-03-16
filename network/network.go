@@ -19,7 +19,7 @@ var DETECTION_PORT string = ":14272"
 var TCP_LISTEN_PORT string = ":14279"
 var HALL_LIGHTS_PORT string = ":14274"
 var TCP_BACKUP_PORT string = ":14275"
-var TCP_NEW_PRIMARY_LISTEN_PORT = ":14276"
+var TCP_NEW_PRIMARY_LISTEN_PORT string = ":14276"
 
 type MessageType string
 

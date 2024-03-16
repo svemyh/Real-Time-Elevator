@@ -116,6 +116,7 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	//(OR HANDLE HERE IF DESIRED)
 
 	//TCPDialAsPrimary
+	fmt.Println("BackupActiveElevatorMap: ", BackupActiveElevatorMap)
 	for ip, _ := range BackupActiveElevatorMap {
 		fmt.Println("Connecting by TCP to the address: ", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
 
