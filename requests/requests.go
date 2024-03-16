@@ -39,6 +39,14 @@ func RequestsHere(e elevator.Elevator) bool {
 	return false
 }
 
+func IsRequestsEmpty(e elevator.Elevator) bool {
+	if RequestsAbove(e) || RequestsBelow(e) || RequestsHere(e) {
+		return false
+	}
+
+	return true
+}
+
 func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehaviour) { // Elevator doesn't have a motorDirection, but it does have a Dirn
 	if RequestsAbove(e) {
 		e.Dirn = elevio.D_Up
@@ -47,7 +55,7 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
 	} else if RequestsHere(e) {
 		e.Dirn = elevio.D_Stop
 	}
-	switch e.Dirn {
+	switch e.Dirn { // REDUNDANT COPIES
 	case elevio.D_Up:
 		if RequestsAbove(e) {
 			return elevio.D_Up, elevator.EB_Moving
@@ -65,8 +73,12 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
 			return elevio.D_Up, elevator.EB_Moving
 		}
 	case elevio.D_Stop:
-		if RequestsHere(e) {
+		if RequestsBelow(e) {
+			return elevio.D_Down, elevator.EB_Moving
+		} else if RequestsHere(e) {
 			return elevio.D_Up, elevator.EB_DoorOpen
+		} else if RequestsAbove(e) {
+			return elevio.D_Up, elevator.EB_Moving
 		}
 
 	}
