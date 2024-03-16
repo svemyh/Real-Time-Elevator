@@ -325,6 +325,16 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			fmt.Println("In case disconnectedElevator:formatted:", strings.Split(disconnectedElevator, ":")[0])
 			delete(ActiveElevatorMap, strings.Split(disconnectedElevator, ":")[0])
 			fmt.Println("after removing elevator, active elev map is: ", ActiveElevatorMap)
+			fmt.Println("1) ", strings.Split(disconnectedElevator, ":")[0])
+			fmt.Println("2) ", disconnectedElevator)
+			fmt.Println("3) ", BackupAddr)
+
+			if strings.Split(disconnectedElevator, ":")[0] == BackupAddr {
+				fmt.Println("Backup disconnected. Removing it ")
+				BackupAddr = ""
+				backupConn.Close()
+				fmt.Println("4) ", BackupAddr)
+			}
 
 			// TODO: Implement TCPSendDisconnectedElevator(disconnectedElevator) // Backup also needs this information
 			// WaitForAcknowledgment(AckCh)
