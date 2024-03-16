@@ -5,8 +5,6 @@ import (
 	"elevator/elevio"
 )
 
-var elevatorState elevator.Elevator
-
 func requestsAbove(e elevator.Elevator) bool {
 	for f := e.Floor + 1; f < elevio.N_Floors; f++ {
 		for btn := range e.Requests[f] {
@@ -72,7 +70,7 @@ func ShouldStop(e elevator.Elevator) bool {
 	}
 }
 
-func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Button) bool { // changed to Button from ButtonType
+func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Button) bool { 
 	// Assuming you have a configuration for ClearRequestVariant
 	switch e.Config.ClearRequestVariant {
 	case elevator.CV_All:
@@ -86,10 +84,10 @@ func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
-func ClearAtCurrentFloor(e elevator.Elevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) elevator.Elevator { // not finished
-	// Implement logic based on e.Config.ClearRequestVariant
-	// Update e.Requests accordingly
-
+func ClearAtCurrentFloor(e 						elevator.Elevator, 
+						 FSMHallOrderCompleteCh chan elevio.ButtonEvent, 
+						 CabCopyCh 				chan [elevio.N_Floors][elevio.N_Buttons]bool,
+) elevator.Elevator { 
 	switch e.Config.ClearRequestVariant {
 	case elevator.CV_All:
 		for button := 0; button < elevio.N_Buttons; button++ { 
