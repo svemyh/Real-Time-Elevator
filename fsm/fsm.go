@@ -80,7 +80,13 @@ func handleRequestButtonPress(btnFloor 					int,
 			//fmt.Println("Elevator state moving dirn", elevatorState.Dirn)
 
 		case elevator.EB_Idle:
-			
+			log.Println("handleRequestButtonPress3 - DoorOpen")
+			doorIsOpen(true)
+			timer.DoorTimerStart(doorOpenDurationS)
+			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
+			if btnType != elevio.B_Cab { // FSMHallOrderCompleteCh only accepts
+				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: btnFloor, Button: elevio.ButtonType(btnType)}
+			}
 		}
 	}
 	CabCopyCh <- elevatorState.Requests
