@@ -134,8 +134,8 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		}
 		log.Println("Operating as client...")
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		go TCPListenForNewPrimary(TCP_NEW_PRIMARY_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		conn, err := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
+		go TCPListenForNewPrimary(GetLocalIPv4() + TCP_NEW_PRIMARY_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
+		conn, err := TCPListenForBackupPromotion(GetLocalIPv4() + TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
 		if err != nil {
 			panic(err)
 		}
@@ -156,7 +156,7 @@ func TCPListenForNewPrimary(KCPPort string, FSMStateUpdateCh chan hall_request_a
 	}
 	defer ls.Close()
 
-	fmt.Println("-TCPListenForNewPrimary() listening for new primary connections to port:", TCPPort)
+	fmt.Println("-TCPListenForNewPrimary() listening for new primary connections to port:", KCPPort)
 	for {
 		conn, err := ls.AcceptKCP()
 		if err != nil {

@@ -176,7 +176,7 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)
 	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                                     //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, ConsumerChannels) //Continously listen if new elevator entring networks is trying to establish connection
+	go TCPListenForNewElevators(GetLocalIPv4() + TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, ConsumerChannels) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, BroadcastCombinedHallRequestsCh)
 
 	for {
