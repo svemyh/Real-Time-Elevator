@@ -165,9 +165,7 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	AckCh chan bool,
-	ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) { // Arguments: StateUpdateCh, OrderCompleteCh, ActiveElevators
-	//start by establishing TCP connection with yourself (can be done in TCPListenForNewElevators)
-	//OR, establish self connection once in RUNPRIMARYBACKUP() and handle selfconnect for future primary in backup.BecomePrimary()
+	ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 
 	clientTxEnable := make(chan bool)
 	clientUpdateCh := make(chan ClientUpdate)
@@ -193,12 +191,6 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	}
 }
 
-// get new states everytime a local elevator updates their states.
-// We then can operate as a primary alone on network or a primary with other elevators on network
-// we start by initializing a backup if possible
-// then if we have other elevators on network then assign hall req for each elevator(by cost) distribute them and button lights
-// if there are other elevators on network then send states to the backup
-
 func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 	CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	StateUpdateCh chan hall_request_assigner.ActiveElevator,
@@ -207,19 +199,18 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	AckCh chan bool,
 	BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+
 	BackupAddr := ""
 	var backupConn net.Conn
-	//var ActiveElevators []ActiveElevator // init here or take in as param to func, allows Backup.BecomePrimary to send in prev states
-	//can send in as empty array first time primary takes over
 
-	if len(ActiveElevatorMap) > 0 { // Guarantees that when backup is promoted to primary, that the current active hall requests are redistributed without the necessity of an event occuring (i.e. button pressed, floor arrival, elevator disconnected)
+	if len(ActiveElevatorMap) > 0 { // Guarantees that when Backup is promoted to Primary, that the current active hall requests are redistributed without the necessity of an event occuring (i.e. button pressed, floor arrival, elevator disconnected)
 		StateUpdateCh <- hall_request_assigner.ActiveElevator{
 			Elevator:  ActiveElevatorMap[GetMapKey(ActiveElevatorMap)],
 			MyAddress: GetMapKey(ActiveElevatorMap),
 		}
 	}
 	for {
-
+		// Guarantees that ActiveElevatorMap contains Primary
 		if _, exists := ActiveElevatorMap[GetLocalIPv4()]; !exists && len(ActiveElevatorMap) > 0 { // TODO: add case for if len=0
 			fmt.Println("Primary is not in ActiveElevatorMap. Adding it.")
 			StateUpdateCh <- hall_request_assigner.ActiveElevator{
@@ -231,34 +222,20 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
-		case stateUpdate := <-StateUpdateCh: //updates if new state is sendt on one of TCP conns, blocks if not
-			//TODO: compare the state update from single elevator to active elevator array and update activeElevators
-			//TODO: update some sort of global HALLREQ array with the new hall requests
+		case stateUpdate := <-StateUpdateCh:
 			fmt.Println("StateUpdate: ", stateUpdate)
-
-			// 0) If stateUpdate.MyAddress not in ActiveElevators -> stateUpdate ActiveElevators.Append()
-			// 1) Overwrite the rest of the states (including cab requests) / 0 & 1 effectively same
 			ActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
-			//case len(ActiveElevatorMap) == 1:
 
-			// 2) OR new button-presses in new ActiveElevators to CombinedHallRequests // TODO:
-			// hall_request_assigner.ActiveElevators_to_CombinedHallRequests() or similar
-
-			// Pick one of the elevators in ActiveElevatorMap
-
-			// 3) IF not backup -> init a backup; IF backup exists -> send stateInfo to backup
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
-					// init a backup here:
 					fmt.Println("Backup does not exists yet. Initializing it..")
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
 				}
-				TCPSendActiveElevator(backupConn, stateUpdate) // TODO: Needs to be updated to TCPSendActiveElevatorWithAck() which blocks until ack recieved.
-				//This function is only for the backup/primary-communication.
+				TCPSendActiveElevator(backupConn, stateUpdate)
 				go func() {
-					select { // Blocks until signal received on either of these
+					select {
 					case <-AckCh:
 						fmt.Println("ACK received: In case stateUpdate")
 						CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
@@ -273,47 +250,22 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				}()
 			}
 
-			// For test purposes
-			//CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
-			//BroadcastCombinedHallRequestsCh <- CombinedHallRequests
-			//AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
-
-			//if len(ActiveElevators) > 1 {
-			//TODO: assign  new backup if needed based based on state update.
-			//TODO: send updated states to backup (with ack) (if there still is a backup)
-			//TODO: assign new new hall orders for each elevator through cost-func
-
-			//DistributeHallRequests(assignedHallReq)     //Distribute new hall requests to each elevator, needs ack and blocking until done
-			//DistributeHallButtonLights(assignedHallReq) //Distribute the button lights to each now that we have ack from each
-			//} else {
-			//TODO: assign new new hall orders for each elevator through cost-func. we are now a primary alone on network
-			//TODO: Should have some check to see if are a primary that lost network (so a new primary has been made) or if we have network connection and no other elevators on net
-
-			//backup = nil
-			//DistributeHallRequests()     //Distribute new hall requests to each elevator, needs ack and blocking until done
-			//DistributeHallButtonLights() //Distribute the button lights to each now that we have ack from each
-			//}
-
 		case completedOrder := <-HallOrderCompleteCh:
-			//TODO: clear order from some sort of global HALLREQ array
 			fmt.Println("\n---- Order completed at floor:", completedOrder)
 			CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
 			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
-					// init a backup here:
 					fmt.Println("Backup does not exists yet. Initializing it..")
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
 				}
-				TCPSendButtonEvent(backupConn, completedOrder) // Writing to Backup
-				// TODO: Wait for ACK
+				TCPSendButtonEvent(backupConn, completedOrder)
 				go func() {
-					select { // Blocks until signal recieved on either of these
+					select {
 					case <-AckCh:
-						// Do nothing
 						fmt.Println("ACK received: In case completedOrder")
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case completedOrder")
@@ -321,9 +273,6 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					}
 				}()
 			}
-
-			//CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
-			//ssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 
 		case disconnectedElevator := <-DisconnectedElevatorCh:
 			fmt.Println("In case disconnectedElevator: recieved:", disconnectedElevator)
@@ -341,22 +290,17 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				fmt.Println("4) ", BackupAddr)
 			}
 
-			// TODO: Implement TCPSendDisconnectedElevator(disconnectedElevator) // Backup also needs this information
-			// WaitForAcknowledgment(AckCh)
-
-			// TODO: if disconnectedElevator == backupElevator DO: initialize a new Backup
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
-					// init a backup here:
 					fmt.Println("Backup does not exists yet. Initializing it..")
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
 				}
 
-				TCPSendString(backupConn, disconnectedElevator)
-				go func() { // wait for ACK
-					select { // Blocks until signal received on either of these
+				TCPSendString(backupConn, disconnectedElevator) // Gives notice to backup of disconnected elevator
+				go func() {
+					select {
 					case <-AckCh:
 						fmt.Println("ACK received: In case stateUpdate")
 						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
@@ -367,16 +311,6 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				}()
 			}
 		}
-	}
-}
-
-func WaitForAcknowledgment(ackCh chan bool) {
-	select {
-	case <-ackCh:
-		return
-	case <-time.After(5 * time.Second):
-		fmt.Println("Timeout occurred. No ACK received.")
-		// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
 	}
 }
 
