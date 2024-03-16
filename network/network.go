@@ -381,30 +381,39 @@ func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh 
 	// NB: Replaces TCPWriteElevatorStates
 	// TODO: Package content into json of type MsgCombinedElevatorRequests before sending
 	// TODO: Add a go-routine for checking if conn is alive by sending PINGs
+	errCh := make(chan error)
+	go SendHeartbeats(conn, errCh)
 	for {
-		assignedHallRequests := <-personalAssignedHallRequestsCh
-		myAssignedHallRequestsMsg := MsgCombinedHallRequests{
-			Type:    TypeActiveElevator,
-			Content: assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()],
-		}
-		fmt.Println("myAssignedHallRequestsMsg:", myAssignedHallRequestsMsg)
-		data, err := json.Marshal(myAssignedHallRequestsMsg)
-		if err != nil {
-			fmt.Println("Error encoding AssignedHallRequests to json: ", err)
-			return
-		}
+		select {
+		case assignedHallRequests := <-personalAssignedHallRequestsCh:
+			myAssignedHallRequestsMsg := MsgCombinedHallRequests{
+				Type:    TypeActiveElevator,
+				Content: assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()],
+			}
+			fmt.Println("myAssignedHallRequestsMsg:", myAssignedHallRequestsMsg)
+			data, err := json.Marshal(myAssignedHallRequestsMsg)
+			if err != nil {
+				fmt.Println("Error encoding AssignedHallRequests to json: ", err)
+				return
+			}
 
-		_, err = conn.Write(data)
-		if err != nil {
-			fmt.Println("Error sending AssignedHallRequestsMsg: ", err)
+			_, err = conn.Write(data)
+			if err != nil {
+				fmt.Println("Error sending AssignedHallRequestsMsg: ", err)
+				return
+			}
+			time.Sleep(50 * time.Millisecond)
+			log.Print("CURRENT TIME")
+			fmt.Println("assignedHallRequests total -- ", assignedHallRequests)
+			fmt.Println("assigned hall req to thsi conn: ", assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
+			fmt.Println("conn that is sending: ", conn.RemoteAddr().String())
+			fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
+		case err := <-errCh:
+			fmt.Printf("Connection error, terminating TCPWriteAssignedHallRequests: %v\n", err)
+			// TODO: DisconnectedElevatorCh <- conn.RemoteAddr().(*net.TCPAddr).IP.String()
 			return
+
 		}
-		time.Sleep(50 * time.Millisecond)
-		log.Print("CURRENT TIME")
-		fmt.Println("assignedHallRequests total -- ", assignedHallRequests)
-		fmt.Println("assigned hall req to thsi conn: ", assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
-		fmt.Println("conn that is sending: ", conn.RemoteAddr().String())
-		fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
 	}
 }
 
