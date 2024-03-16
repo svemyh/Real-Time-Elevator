@@ -376,7 +376,7 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 }
 
 // Distributes assigned hall requests out to the individual FSMs. Sends to TCPReadAssignedHallRequests().
-func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, DisconnectedElevatorCh chan string) {
 	defer conn.Close()
 	// NB: Replaces TCPWriteElevatorStates
 	// TODO: Package content into json of type MsgCombinedElevatorRequests before sending
@@ -410,7 +410,7 @@ func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh 
 			fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
 		case err := <-errCh:
 			fmt.Printf("Connection error, terminating TCPWriteAssignedHallRequests: %v\n", err)
-			// TODO: DisconnectedElevatorCh <- conn.RemoteAddr().(*net.TCPAddr).IP.String()
+			DisconnectedElevatorCh <- conn.RemoteAddr().(*net.TCPAddr).IP.String() // TODO: Test this
 			return
 
 		}
