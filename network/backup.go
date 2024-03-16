@@ -115,6 +115,10 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	//Note, the elevator list will contain your own IP. DO NOT CONNECT TO IT, as PrimaryRoutine will make this connection
 	//(OR HANDLE HERE IF DESIRED)
 
+	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
+	ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+	//go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
+
 	//TCPDialAsPrimary
 	fmt.Println("BackupActiveElevatorMap: ", BackupActiveElevatorMap)
 	for ip, _ := range BackupActiveElevatorMap {
@@ -127,12 +131,15 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 		}
 
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
+		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+		ConsumerChannels[conn] = personalAssignedHallRequestsCh
+		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
 
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
-		go TCPWriteElevatorStates(conn, AssignHallRequestsCh)
+
 	}
 
 	time.Sleep(1500 * time.Millisecond)
 
-	PrimaryRoutine(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+	PrimaryRoutine(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels)
 }
