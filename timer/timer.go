@@ -7,19 +7,19 @@ import (
 var timer *time.Timer
 var timerActive bool
 
-func TimerStart(duration int64) {
+func DoorTimerStart(duration int64) {
 	timer = time.NewTimer(time.Duration(duration) * time.Second)
 	timerActive = true
 }
 
-func TimerStop() {
+func DoorTimerStop() {
 	if timer != nil {
 		timer.Stop()
 	}
 	timerActive = false
 }
 
-func TimerTimedOut() bool {
+func DoorTimerTimedOut() bool {
 	if !timerActive {
 		return false
 	}
