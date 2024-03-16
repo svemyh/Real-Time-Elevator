@@ -11,6 +11,7 @@ import (
 	"net"
 	"strings"
 	"time"
+	"github.com/xtaci/kcp-go"
 )
 
 type Primary struct {
@@ -131,7 +132,7 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 }
 
 func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
-	ls, err := net.Listen("tcp", TCPPort)
+	ls, err := kcp.Listen(TCPPort)
 	if err != nil {
 		fmt.Println("The connection failed. Error:", err)
 		return
@@ -174,7 +175,7 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)
 	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                                     //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, ConsumerChannels) //Continously listen if new elevator entring networks is trying to establish connection
+	go TCPListenForNewElevators(GetLocalIPv4() + TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, ConsumerChannels) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, BroadcastCombinedHallRequestsCh)
 
 	for {

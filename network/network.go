@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"github.com/xtaci/kcp-go"
 )
 
 var DETECTION_PORT string = ":14272"
@@ -132,8 +133,8 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		}
 		log.Println("Operating as client...")
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		go TCPListenForNewPrimary(TCP_NEW_PRIMARY_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		conn, err := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
+		go TCPListenForNewPrimary(GetLocalIPv4() + TCP_NEW_PRIMARY_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
+		conn, err := TCPListenForBackupPromotion(GetLocalIPv4() + TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
 		if err != nil {
 			panic(err)
 		}
@@ -147,7 +148,7 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
 	//go TCPReadElevatorStates(stateUpdateCh)
-	ls, err := net.Listen("tcp", TCPPort)
+	ls, err := kcp.Listen(TCPPort)
 	if err != nil {
 		fmt.Println("The connection failed. Error:", err)
 		return
@@ -171,7 +172,7 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 	fmt.Println(" - Executing TCPListenForBackupPromotion()")
 
-	ls, err := net.Listen("tcp", port)
+	ls, err := kcp.Listen(port)
 	if err != nil {
 		fmt.Println("TCPListenForBackupPromotion - The connection failed. Error:", err)
 		return nil, err
@@ -192,7 +193,7 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	fmt.Println("Connecting by TCP to the address: ", PrimaryAddress)
 
-	conn, err := net.Dial("tcp", PrimaryAddress)
+	conn, err := kcp.Dial(PrimaryAddress)
 	if err != nil {
 		fmt.Println("Connection failed. Error: ", err)
 		return
@@ -295,7 +296,7 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 
 	for {
 		assignedHallRequests := <-personalAssignedHallRequestsCh
-		data, err := json.Marshal(assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
+		data, err := json.Marshal(assignedHallRequests[strings.Split(conn.RemoteAddr().String(), ":")[0]])
 		if err != nil {
 			fmt.Println("Error encoding hallRequests to json: ", err)
 			return
@@ -309,9 +310,9 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 		time.Sleep(500 * time.Millisecond)
 		log.Print("Current time")
 		fmt.Println("assignedHallRequests total -- ", assignedHallRequests)
-		fmt.Println("assigned hall req to thsi conn:: ", assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
+		fmt.Println("assigned hall req to thsi conn:: ", assignedHallRequests[strings.Split(conn.RemoteAddr().String(), ":")[0]])
 		fmt.Println("conn that is sending: ", conn.RemoteAddr().String())
-		fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
+		fmt.Println("How we format the conn: ", conn.RemoteAddr().String())
 	}
 }
 
@@ -390,7 +391,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 func TCPDialBackup(address string, port string) net.Conn {
 	fmt.Println("TCPDialBackup() - Connecting by TCP to the address: ", address+port)
 
-	conn, err := net.Dial("tcp", address+port)
+	conn, err := kcp.Dial(address+port)
 	if err != nil {
 		fmt.Println("Error in TCPDialBackup() - Connection failed. Error: ", err)
 		return nil

@@ -10,6 +10,7 @@ import (
 	"net"
 	"strings"
 	"time"
+	"github.com/xtaci/kcp-go"
 )
 
 type Backup struct {
@@ -124,7 +125,7 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	for ip, _ := range BackupActiveElevatorMap {
 		fmt.Println("Connecting by TCP to the address: ", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
 
-		conn, err := net.Dial("tcp", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
+		conn, err := kcp.Dial(ip+TCP_NEW_PRIMARY_LISTEN_PORT)
 		if err != nil {
 			fmt.Println("Connection failed. Error: ", err)
 			return
