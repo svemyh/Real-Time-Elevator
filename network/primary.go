@@ -254,12 +254,12 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				}
 				TCPSendActiveElevator(backupConn, stateUpdate) // TODO: Needs to be updated to TCPSendActiveElevatorWithAck() which blocks until ack recieved.
 				//This function is only for the backup/primary-communication.
-				CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
-				BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 				go func() {
 					select { // Blocks until signal received on either of these
 					case <-AckCh:
 						fmt.Println("ACK received: In case stateUpdate")
+						CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
+						BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")

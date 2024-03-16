@@ -206,10 +206,15 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 			// TODO: Implement later
 
 		case AssignedHallRequests := <-FSMAssignedHallRequestsCh:
-
+			fmt.Println("AssignedHallRequests := <-FSMAssignedHallRequestsCh", AssignedHallRequests)
 			for i := 0; i < elevio.N_Floors; i++ {
 				for j := 0; j < 2; j++ {
 					elevatorState.Requests[i][j] = false
+				}
+			}
+			for i := 0; i < elevio.N_Floors; i++ {
+				for j := 0; j < 2; j++ {
+					//elevatorState.Requests[i][j] = false
 					if AssignedHallRequests[i][j] {
 						FsmOnRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh, CabCopyCh)
 						time.Sleep(5 * time.Millisecond)

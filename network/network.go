@@ -229,6 +229,7 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 			break
 		}
 		FSMAssignedHallRequestsCh <- assignedHallRequests
+		fmt.Println("FSMAssignedHallRequestsCh <- assignedHallRequests & conn.LocalAddr(): ", assignedHallRequests, conn.LocalAddr())
 		time.Sleep(50 * time.Millisecond)
 	}
 }
