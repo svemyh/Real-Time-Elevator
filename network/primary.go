@@ -261,6 +261,8 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 						CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
 						BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+						fmt.Println("BroadcastCombinedHallRequestsCh <- : ", CombinedHallRequests)
+						fmt.Println("AssignHallRequestsCh <- : ", hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests))
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead

@@ -306,7 +306,11 @@ func TCPWriteElevatorStates(conn net.Conn, AssignedHallRequestsCh chan map[strin
 			return
 		}
 		time.Sleep(500 * time.Millisecond)
-		fmt.Println("assignedHallRequests -- ", assignedHallRequests)
+		log.Print("Current time")
+		fmt.Println("assignedHallRequests total -- ", assignedHallRequests)
+		fmt.Println("assigned hall req to thsi conn:: ", assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
+		fmt.Println("conn that is sending: ", conn.RemoteAddr().String())
+		fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
 	}
 }
 
