@@ -199,7 +199,7 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 	CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	StateUpdateCh chan hall_request_assigner.ActiveElevator,
-	HallOrdejrCompleteCh chan elevio.ButtonEvent,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	AckCh chan bool,
@@ -219,7 +219,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
-		case staateUpdate := <-StateUpdateCh: //updates if new state is sendt on one of TCP conns, blocks if not
+		case stateUpdate := <-StateUpdateCh: //updates if new state is sendt on one of TCP conns, blocks if not
 			//TODO: compare the state update from single elevator to active elevator array and update activeElevators
 			//TODO: update some sort of global HALLREQ array with the new hall requests
 			fmt.Println("StateUpdate: ", stateUpdate)
@@ -251,7 +251,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					select { // Blocks until signal received on either of these
 					case <-AckCh:
 						fmt.Println("ACK received: In case stateUpdate")
-						AssigcnHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
@@ -285,7 +285,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			fmt.Println("\n---- Order completed at floor:", completedOrder)
 			CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
 			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
-d
+
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
 					// init a backup here:
