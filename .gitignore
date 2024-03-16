@@ -1,0 +1,28 @@
+# Binaries for programs and plugins
+*.exe
+!hall_request_assigner.exe
+!SimElevatorServer
+!elevatorserver
+*.dll
+*.so
+*.dylib
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Project-specific binaries
+!hall_request_assigner
+
+# Ignore other potential binary names that might be built from the source
+!*/hall_request_assigner
+!*/hall_request_assigner.exe
+!**/SimElevatorServer
+!**/elevatorserver
+
+# Exclude all .exe files from the top-level directory except hall_request_assigner.exe
+/*.exe
+!/hall_request_assigner.exe
+
+# Ignore the directories where binaries might be stored
+/bin/
+/pkg/
