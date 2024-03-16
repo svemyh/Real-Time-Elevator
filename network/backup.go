@@ -10,6 +10,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/xtaci/kcp-go"
 )
 
 type Backup struct {
@@ -17,7 +19,7 @@ type Backup struct {
 	lastSeen time.Time
 }
 
-func BackupRoutine(conn net.Conn, primaryAddress string,
+func BackupRoutine(conn *kcp.UDPSession, primaryAddress string,
 	StateUpdateCh chan hall_request_assigner.ActiveElevator,
 	HallOrderCompleteCh chan elevio.ButtonEvent,
 	DisconnectedElevatorCh chan string,
@@ -116,19 +118,20 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	//(OR HANDLE HERE IF DESIRED)
 
 	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
-	ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+	ConsumerChannels := make(map[*kcp.UDPSession]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
 	//go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
 
 	//TCPDialAsPrimary
 	fmt.Println("BackupActiveElevatorMap: ", BackupActiveElevatorMap)
 	for ip, _ := range BackupActiveElevatorMap {
-		fmt.Println("Connecting by TCP to the address: ", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
+		fmt.Println("Connecting by KCP to the address: ", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
 
-		conn, err := net.Dial("tcp", ip+TCP_NEW_PRIMARY_LISTEN_PORT)
+		conn, err := kcp.DialWithOptions(ip+TCP_NEW_PRIMARY_LISTEN_PORT, nil, 10, 3)
 		if err != nil {
 			fmt.Println("Connection failed. Error: ", err)
 			return
 		}
+		conn.SetNoDelay(1, 20, 2, 1)
 
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
 		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)

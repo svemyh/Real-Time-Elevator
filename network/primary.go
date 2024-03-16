@@ -11,6 +11,7 @@ import (
 	"net"
 	"strings"
 	"time"
+	"github.com/xtaci/kcp-go"
 )
 
 type Primary struct {
@@ -130,24 +131,25 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	}
 }
 
-func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
-	ls, err := net.Listen("tcp", TCPPort)
+func TCPListenForNewElevators(KCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, ConsumerChannels map[*kcp.UDPSession]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	ls, err := kcp.ListenWithOptions(KCPPort, nil, 10, 3)
 	if err != nil {
 		fmt.Println("The connection failed. Error:", err)
 		return
 	}
 	defer ls.Close()
-	fmt.Println("Primary is listening for new connections to port:", TCPPort)
+	fmt.Println("Primary is listening for new connections to port:", KCPPort)
 
 	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
 	go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
 
 	for {
-		conn, err := ls.Accept()
+		conn, err := ls.AcceptKCP()
 		if err != nil {
 			fmt.Println("Error: ", err)
 			continue
 		}
+		conn.SetNoDelay(1, 20, 2, 1)
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
 		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
 		ConsumerChannels[conn] = personalAssignedHallRequestsCh
@@ -165,7 +167,7 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	AckCh chan bool,
-	ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	ConsumerChannels map[*kcp.UDPSession]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 
 	clientTxEnable := make(chan bool)
 	clientUpdateCh := make(chan ClientUpdate)
@@ -201,7 +203,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 	BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 
 	BackupAddr := ""
-	var backupConn net.Conn
+	var backupConn *kcp.UDPSession
 
 	if len(ActiveElevatorMap) > 0 { // Guarantees that when Backup is promoted to Primary, that the current active hall requests are redistributed without the necessity of an event occuring (i.e. button pressed, floor arrival, elevator disconnected)
 		StateUpdateCh <- hall_request_assigner.ActiveElevator{
@@ -330,7 +332,7 @@ func GetMapKey(ActiveElevatorMap map[string]elevator.Elevator) string {
 	return ""
 }
 
-func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.ActiveElevator) {
+func TCPSendActiveElevator(conn *kcp.UDPSession, activeElevator hall_request_assigner.ActiveElevator) {
 	myActiveElevatorMsg := MsgActiveElevator{
 		Type:    TypeActiveElevator,
 		Content: activeElevator,
@@ -351,7 +353,7 @@ func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.A
 	time.Sleep(50 * time.Millisecond)
 }
 
-func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
+func TCPSendButtonEvent(conn *kcp.UDPSession, buttonEvent elevio.ButtonEvent) {
 	myButtonEventMsg := MsgButtonEvent{
 		Type:    TypeButtonEvent,
 		Content: buttonEvent,
@@ -371,7 +373,7 @@ func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
 	time.Sleep(50 * time.Millisecond)
 }
 
-func TCPSendACK(conn net.Conn) {
+func TCPSendACK(conn *kcp.UDPSession) {
 	myACKMsg := MsgACK{
 		Type:    TypeACK,
 		Content: true,
@@ -392,7 +394,7 @@ func TCPSendACK(conn net.Conn) {
 	time.Sleep(50 * time.Millisecond)
 }
 
-func TCPSendString(conn net.Conn, str string) {
+func TCPSendString(conn *kcp.UDPSession, str string) {
 	myStringMsg := MsgString{
 		Type:    TypeString,
 		Content: str,
@@ -477,7 +479,7 @@ func SetAllHallLights(CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 
 }
 
 // Alias: Server()
-func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bool) {
+func TCPReadACK(conn *kcp.UDPSession, DisconnectedElevatorCh chan string, AckCh chan bool) {
 	//TODO:Read the states and store in a buffer
 	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
