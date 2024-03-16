@@ -243,10 +243,12 @@ func FSMRun(device elevio.ElevInputDevice,
 				for obstructionSignal && isDoorOpen {
 					doorIsOpen(true)
 					fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
+					EB_StuckCh <- true
 					obstructionSignal := <-device.ObstructionCh
 					if !obstructionSignal {
 						doorIsOpen(false)
 						fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
+						EB_StuckCh <- false
 						time.Sleep(500 * time.Millisecond)
 						break
 					}
