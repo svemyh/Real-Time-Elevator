@@ -168,7 +168,8 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 			continue
 		}
 
-		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)                 // REPLACE TO: TCPReadAssignedHallRequests()
+		//go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)                 // REPLACE TO: TCPReadAssignedHallRequests()
+		go TCPReadAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
 		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
 	}
 }
@@ -207,7 +208,8 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 	fmt.Println("Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
 
-	go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh) // REPLACE TO: TCPReadAssignedHallRequests()
+	// go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh) // REPLACE TO: TCPReadAssignedHallRequests()
+	go TCPReadAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
 	sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh)
 }
 
