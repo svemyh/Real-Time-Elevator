@@ -34,6 +34,7 @@ const (
 	TypeACK                  MessageType = "ACK"
 	TypeString               MessageType = "string"
 	TypeCombinedHallRequests MessageType = "CombinedHallRequests"
+	TypePing                 MessageType = "PING"
 )
 
 type Message interface{}
@@ -61,6 +62,11 @@ type MsgString struct {
 type MsgCombinedHallRequests struct {
 	Type    MessageType                                 `json:"type"`
 	Content [elevio.N_Floors][elevio.N_Buttons - 1]bool "json:content"
+}
+
+type MsgPing struct {
+	Type    MessageType `json:"type"`
+	Content string      "json:content"
 }
 
 type ClientUpdate struct {
@@ -162,7 +168,7 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 			continue
 		}
 
-		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
+		go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)                 // REPLACE TO: TCPReadAssignedHallRequests()
 		go sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh) // This will terminate whenever the connection/conn is closed - i.e. conn.Write() throws an error.
 	}
 }
@@ -201,11 +207,12 @@ func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_as
 	fmt.Println("Conection established to: ", conn.RemoteAddr())
 	defer conn.Close()
 
-	go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh)
+	go RecieveAssignedHallRequests(conn, FSMAssignedHallRequestsCh) // REPLACE TO: TCPReadAssignedHallRequests()
 	sendLocalStatesToPrimaryLoop(conn, FSMStateUpdateCh, FSMHallOrderCompleteCh)
 }
 
 func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) { // NOT TESTED!
+	// NB: To be replaced by TCPReadAssignedHallRequests()
 	fmt.Printf("RecieveAssignedHallRequests() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
 
 	defer conn.Close()
@@ -232,6 +239,55 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 		FSMAssignedHallRequestsCh <- assignedHallRequests
 		fmt.Println("FSMAssignedHallRequestsCh <- assignedHallRequests & conn.LocalAddr(): ", assignedHallRequests, conn.LocalAddr())
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// Recieves assigned hall orders from cost-function and feeds it into FSM of local machine. Message is recieved from TCPWriteAssignedHallRequests().
+func TCPReadAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	// NB: Replaces RecieveAssignedHallRequests()
+	fmt.Printf("TCPReadAssignedHallRequests() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
+
+	defer conn.Close()
+	for {
+		time.Sleep(50 * time.Millisecond)
+		//// ------------------------------------------------------------------
+
+		// Create buffer and read data into the buffer using conn.Read()
+		var buf [bufSize]byte
+		n, err := conn.Read(buf[:])
+		if err != nil {
+			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
+			//DisconnectedElevatorCh <- conn.RemoteAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
+			break
+			//conn.Close()
+			//panic(err)
+		}
+
+		// Decoding said data into a json-style object
+		var genericMsg map[string]interface{}
+		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
+			fmt.Println("Error unmarshaling generic message: ", err)
+			panic(err)
+		}
+		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
+		switch MessageType(genericMsg["type"].(string)) {
+		case TypeCombinedHallRequests:
+			var msg MsgCombinedHallRequests
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+			}
+			fmt.Printf("Received string object: %+v\n", msg)
+			FSMAssignedHallRequestsCh <- msg.Content
+			fmt.Println("FSMAssignedHallRequestsCh <- msg.Content & conn.LocalAddr(): ", msg.Content, conn.LocalAddr())
+		case TypePing:
+			var msg MsgPing
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+			}
+			fmt.Println("TCPReadAssignedHallRequests() - Recieved PING: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
+		default:
+			fmt.Println("TCPReadAssignedHallRequests() - Unknown message type")
+		}
 	}
 }
 
@@ -290,7 +346,9 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 //receiverChan := make(chan string)
 //go network.Reciever(receiverChan, "localhost:20013")
 
+// Sends to RecieveAssignedHallRequests
 func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	// NB: To be replaced by TCPWriteAssignedHallRequests()
 	defer conn.Close()
 
 	for {
@@ -310,6 +368,39 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 		log.Print("Current time")
 		fmt.Println("assignedHallRequests total -- ", assignedHallRequests)
 		fmt.Println("assigned hall req to thsi conn:: ", assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
+		fmt.Println("conn that is sending: ", conn.RemoteAddr().String())
+		fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
+	}
+}
+
+// Distributes assigned hall requests out to the individual FSMs. Sends to TCPReadAssignedHallRequests().
+func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+	defer conn.Close()
+	// NB: Replaces TCPWriteElevatorStates
+	// TODO: Package content into json of type MsgCombinedElevatorRequests before sending
+	// TODO: Add a go-routine for checking if conn is alive by sending PINGs
+	for {
+		assignedHallRequests := <-personalAssignedHallRequestsCh
+		myAssignedHallRequestsMsg := MsgCombinedHallRequests{
+			Type:    TypeActiveElevator,
+			Content: assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()],
+		}
+		fmt.Println("myAssignedHallRequestsMsg:", myAssignedHallRequestsMsg)
+		data, err := json.Marshal(myAssignedHallRequestsMsg)
+		if err != nil {
+			fmt.Println("Error encoding AssignedHallRequests to json: ", err)
+			return
+		}
+
+		_, err = conn.Write(data)
+		if err != nil {
+			fmt.Println("Error sending AssignedHallRequestsMsg: ", err)
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+		log.Print("CURRENT TIME")
+		fmt.Println("assignedHallRequests total -- ", assignedHallRequests)
+		fmt.Println("assigned hall req to thsi conn: ", assignedHallRequests[conn.RemoteAddr().(*net.TCPAddr).IP.String()])
 		fmt.Println("conn that is sending: ", conn.RemoteAddr().String())
 		fmt.Println("How we format the conn: ", conn.RemoteAddr().(*net.TCPAddr).IP.String())
 	}
@@ -380,7 +471,12 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			}
 			fmt.Printf("Received string object: %+v\n", msg)
 			DisconnectedElevatorCh <- msg.Content
-
+		case TypePing:
+			var msg MsgPing
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+			}
+			fmt.Println("TCPReadElevatorStates() - Recieved PING: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
 		default:
 			fmt.Println("Unknown message type")
 		}

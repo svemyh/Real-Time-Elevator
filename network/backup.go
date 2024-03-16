@@ -133,7 +133,7 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
 		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
 		ConsumerChannels[conn] = personalAssignedHallRequestsCh
-		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
+		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh) // REPLACE TO: TCPWriteAssignedHallRequests()
 
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
 
