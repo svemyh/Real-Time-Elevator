@@ -408,6 +408,33 @@ func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh 
 	}
 }
 
+// Continously monitors that a net.Conn is still alive
+func SendHeartbeats(conn net.Conn, errCh chan<- error) {
+	for {
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second)) // Adjust to estimated max waiting time for KCP using 35% packetloss
+
+		ping := MsgPing{
+			Type:    TypePing,
+			Content: "PING",
+		}
+
+		data, err := json.Marshal(ping)
+		if err != nil {
+			fmt.Printf("Failed to encode MsgPing to json: %v\n", err)
+			errCh <- err
+			return
+		}
+
+		_, err = conn.Write(data)
+		if err != nil {
+			fmt.Printf("Failed to send heartbeat: %v\n", err)
+			errCh <- err
+			return
+		}
+		time.Sleep(1 * time.Second) // Try reducing this to minimal possible value.
+	}
+}
+
 // Recieves message on AssignedHallRequestsCh and distributes said message to all consumer go-routines ConsumerAssignedHallRequestsCh
 func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, Consumers map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	for hallRequests := range AssignedHallRequestsCh {

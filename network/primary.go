@@ -393,6 +393,28 @@ func TCPSendACK(conn net.Conn) {
 	time.Sleep(50 * time.Millisecond)
 }
 
+// UNUSED?
+func TCPSendPing(conn net.Conn) {
+	myPingMsg := MsgPing{
+		Type:    TypePing,
+		Content: "PING",
+	}
+
+	fmt.Println("TCPSendPing():", myPingMsg)
+	data, err := json.Marshal(myPingMsg)
+	if err != nil {
+		fmt.Println("Error encoding PING to json: ", err)
+		return
+	}
+
+	_, err = conn.Write(data)
+	if err != nil {
+		fmt.Println("Error sending PING: ", err)
+		return
+	}
+	time.Sleep(50 * time.Millisecond)
+}
+
 func TCPSendString(conn net.Conn, str string) {
 	myStringMsg := MsgString{
 		Type:    TypeString,
