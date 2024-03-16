@@ -140,28 +140,64 @@ func FsmOnDoorTimeout(FSMHallOrderCompleteCh chan elevio.ButtonEvent, CabCopyCh 
 	//fmt.Printf("-------------------------------")
 	//fmt.Printf("\nNew state:\n")
 }
-func checkStuck(EB_StuckCh chan bool, FloorSensorCh chan int) {
-	//var lastFloor int
-	var lastTime time.Time
-	stuckDuration := 2 * time.Second
-	go func() {
-		for {
-			select {
-			case <-FloorSensorCh:
+
+func checkStuck(EB_StuckCh chan bool, devicefloor int) {
+	log.Println("----------------------Starting checkStuck. EB_StuckCh:", EB_StuckCh, "sensorFloor:", devicefloor)
+
+	var lastFloor int
+	var lastTime time.Time = time.Now()
+	stuckDuration := 3 * time.Second // faster if you check if DoorOpen
+	for {
+		if elevatorState.Behaviour == elevator.EB_Moving {
+			log.Println("----- Last floor: ", devicefloor, lastFloor)
+			if devicefloor != lastFloor {
 				lastTime = time.Now()
 				EB_StuckCh <- false
-				log.Println("IM NOT STUCK- -------")
-
-			case <-time.After(stuckDuration):
-				if time.Since(lastTime) >= stuckDuration {
-					EB_StuckCh <- true
-					log.Println("IM STUCK- -------")
-				}
+				lastFloor = devicefloor
+				log.Println("------IM NOT STUCK - Floor:", lastFloor)
+				time.Sleep(500 * time.Millisecond)
+				continue
 			}
+
+			if time.Since(lastTime) >= stuckDuration {
+				EB_StuckCh <- true
+				log.Println("IM STUCK - Floor:", lastFloor)
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+		} else {
+			log.Println("-------Sensor floor channel closed!")
+			return
 		}
-	}()
+		time.Sleep(500 * time.Millisecond)
+
+	}
 }
 
+/*
+	func checkStuck(EB_StuckCh chan bool, floor int) {
+	    var lastFloor int
+	    var lastTime time.Time
+	    stuckDuration := 2 * time.Second
+	    go func() {
+	        for {
+	            select {
+	            case <-time.After(stuckDuration):
+	                if time.Since(lastTime) >= stuckDuration {
+	                    EB_StuckCh <- true
+	                    log.Println("IM STUCK - Floor:", lastFloor)
+	                }
+	            default:
+	                // This block executes whenever no other case is ready (floor change)
+	                lastTime = time.Now()
+	                lastFloor = floor
+	                EB_StuckCh <- false  // Optional: Send "not stuck" signal if needed
+	                log.Println("IM NOT STUCK - Floor:", floor)
+	            }
+	        }
+	    }()
+	}
+*/
 func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool, InitCabCopy [elevio.N_Floors]bool, EB_StuckCh chan bool) {
 
 	//elevatorState = elevator.ElevatorInit()
@@ -189,8 +225,8 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 	log.Println("firste elev state to send floor! : ", hall_request_assigner.ActiveElevator{Elevator: elevatorState, MyAddress: network.GetLocalIPv4()}.Elevator.Floor)
 
 	// Polling for new actions/events of the system.
+
 	for {
-		checkStuck(EB_StuckCh, device.FloorSensorCh)
 
 		select {
 		case floor := <-device.FloorSensorCh:
@@ -212,6 +248,8 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 				Elevator:  elevatorState,
 				MyAddress: network.GetLocalIPv4(),
 			}
+			go checkStuck(EB_StuckCh, <-device.FloorSensorCh)
+
 			toBeSentActiveElevatorState.Elevator.Requests[buttonEvent.Floor][buttonEvent.Button] = true
 			if elevatorState.Floor != -1 { // Guarantees that FsmOnInitBetweenFloors() is completed before any button-presses are sent.
 				FSMStateUpdateCh <- toBeSentActiveElevatorState
@@ -226,7 +264,6 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 
 		case obstructionSignal := <-device.ObstructionCh:
 			fmt.Println("Obstruction Detected", obstructionSignal)
-			// TODO: Implement later
 
 		case AssignedHallRequests := <-FSMAssignedHallRequestsCh:
 
@@ -235,19 +272,21 @@ func FsmRun(device elevio.ElevInputDevice, FSMStateUpdateCh chan hall_request_as
 					elevatorState.Requests[i][j] = false
 					if AssignedHallRequests[i][j] {
 						FsmOnRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh, CabCopyCh)
-						time.Sleep(5 * time.Millisecond)
+						time.Sleep(100 * time.Millisecond)
 					}
 				}
 			}
 
 		default:
 			// No action - prevents blocking on channel reads
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
+
 		}
 		if timer.TimerTimedOut() { // should be reworked into a channel. TODO: Implement later
 			timer.TimerStop()
 			FsmOnDoorTimeout(FSMHallOrderCompleteCh, CabCopyCh)
 			// TODO: Implement acceptance tests here?: IF local error (motor failure or other) is detected this infomation can be fed to PrimaryHandler().
 		}
+
 	}
 }
