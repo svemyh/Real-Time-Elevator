@@ -216,6 +216,15 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		}
 	}
 	for {
+
+		if _, exists := ActiveElevatorMap[GetLocalIPv4()]; !exists && len(ActiveElevatorMap) > 0 {
+			fmt.Println("Primary is not in ActiveElevatorMap. Adding it.")
+			StateUpdateCh <- hall_request_assigner.ActiveElevator{
+				Elevator:  ActiveElevatorMap[GetMapKey(ActiveElevatorMap)],
+				MyAddress: GetLocalIPv4(),
+			}
+		}
+
 		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
