@@ -48,6 +48,7 @@ func handleRequestButtonPress(btnFloor 					int,
 		//println("Door Open")
 		if requests.ShouldClearImmediately(elevatorState, btnFloor, btnType) {
 			doorIsOpen(true)
+			log.Println("handleRequestButtonPress1 - DoorOpen")
 			timer.DoorTimerStart(doorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 			if btnType != elevio.B_Cab { // FSMHallOrderCompleteCh only accepts
@@ -67,6 +68,7 @@ func handleRequestButtonPress(btnFloor 					int,
 
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
+			log.Println("handleRequestButtonPress2 - DoorOpen")
 			doorIsOpen(true)
 			timer.DoorTimerStart(doorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
@@ -119,9 +121,11 @@ func handleDoorTimeout(FSMHallOrderCompleteCh 	chan elevio.ButtonEvent,
 		elevatorState.Dirn, elevatorState.Behaviour = requests.ChooseDirection(elevatorState)
 		switch elevatorState.Behaviour {
 		case elevator.EB_DoorOpen:
+			doorIsOpen(true)
 			timer.DoorTimerStart(doorOpenDurationS)
 			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 			setAllCabLights()
+			log.Println("handleDoorTimeout - DoorOpen")
 			
 		case elevator.EB_Moving:
 			doorIsOpen(false)
