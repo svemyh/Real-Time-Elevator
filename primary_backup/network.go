@@ -104,11 +104,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT, clientUpdateCh)
 	if isPrimary {
 		if id == "" {
-			localIP, err := LocalIP()
-			if err != nil {
-				fmt.Println(err)
-				localIP = "DISCONNECTED"
-			}
+			localIP := GetLocalIPv4()
 			id = fmt.Sprintf("Master-%s-%d", localIP, os.Getpid())
 			fmt.Printf("My id: %s\n", id)
 		}
@@ -125,11 +121,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
 		if id == "" {
-			localIP, err := LocalIP()
-			if err != nil {
-				fmt.Println(err)
-				localIP = "DISCONNECTED"
-			}
+			localIP := GetLocalIPv4()
 			id = fmt.Sprintf("Client-%s-%d\n", localIP, os.Getpid())
 			fmt.Printf("My id: %s", id)
 		}
