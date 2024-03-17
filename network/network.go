@@ -23,6 +23,7 @@ var TCP_BACKUP_PORT string = ":14275"
 var TCP_NEW_PRIMARY_LISTEN_PORT string = ":14276"
 var LOCAL_ELEVATOR_ALIVE_PORT string = ":17878"
 
+
 type MessageType string
 
 const bufSize = 1024

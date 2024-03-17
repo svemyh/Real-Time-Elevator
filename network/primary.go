@@ -221,14 +221,14 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 }
 
 func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
-						CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-						StateUpdateCh chan hall_request_assigner.ActiveElevator,
-						HallOrderCompleteCh chan elevio.ButtonEvent,
-						DisconnectedElevatorCh chan string,
-						AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-						AckCh chan bool,
-						BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	) {
+	CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool,
+	BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+) {
 
 	BackupAddr := ""
 	var backupConn net.Conn
@@ -239,6 +239,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			MyAddress: GetMapKey(ActiveElevatorMap),
 		}
 	}
+
 	for {
 		// Guarantees that ActiveElevatorMap contains Primary
 		if _, exists := ActiveElevatorMap[GetLocalIPv4()]; !exists && len(ActiveElevatorMap) > 0 { // TODO: add case for if len=0
@@ -249,13 +250,21 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			}
 		}
 
-		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
+		filteredActiveElevatorMap := make(map[string]elevator.Elevator)
+		log.Println("HALL REQUEST ASSIGNER ActiveElevatorsMap:", ActiveElevatorMap)
+		for ip, elev := range ActiveElevatorMap {
+			if elev.Available { // Check if the elevator is marked as available
+				filteredActiveElevatorMap[ip] = elev
+			}
+		}
+		log.Println("HALL REQUEST ASSIGNER filteredActiveElevatorsMap:", filteredActiveElevatorMap)
+
+		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", filteredActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
 		case stateUpdate := <-StateUpdateCh:
 			fmt.Println("StateUpdate: ", stateUpdate)
 			ActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
-
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
 					fmt.Println("Backup does not exists yet. Initializing it..")
@@ -273,9 +282,9 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 						fmt.Println("ACK received: In case stateUpdate")
 						CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
 						BroadcastCombinedHallRequestsCh <- CombinedHallRequests
-						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(filteredActiveElevatorMap, CombinedHallRequests)
 						fmt.Println("BroadcastCombinedHallRequestsCh <- : ", CombinedHallRequests)
-						fmt.Println("AssignHallRequestsCh <- : ", hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests))
+						fmt.Println("AssignHallRequestsCh <- : ", hall_request_assigner.HallRequestAssigner(filteredActiveElevatorMap, CombinedHallRequests))
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
@@ -342,7 +351,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					select {
 					case <-AckCh:
 						fmt.Println("ACK received: In case disconnectedElevator")
-						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(filteredActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead

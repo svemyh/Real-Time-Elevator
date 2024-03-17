@@ -139,7 +139,24 @@ func handleDoorTimeout(FSMHallOrderCompleteCh 	chan<- elevio.ButtonEvent,
 	}
 }
 
-func checkStuck(EB_StuckCh chan<- bool) {
+func sendLocalStuckElevator(EB_StuckCh chan bool, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator) {
+	for {
+		select {
+		case notAvailable := <-EB_StuckCh:
+			elevatorState.Available = !notAvailable
+			log.Println("Stuck state sent!")
+			toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
+				Elevator:  elevatorState,
+				MyAddress: network.GetLocalIPv4(),
+			}
+			FSMStateUpdateCh <- toBeSentActiveElevatorState
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+}
+
+func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 	//log.Println("Starting checkStuck.")
 
 	var lastFloor int = -1
@@ -172,17 +189,17 @@ func checkStuck(EB_StuckCh chan<- bool) {
 			log.Println("Elevator has no more requests. Not checking for stuck condition.")
 			return
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
 func FSMRun(device 							elevio.ElevInputDevice, 
-			FSMStateUpdateCh 				chan<- hall_request_assigner.ActiveElevator, 
+			FSMStateUpdateCh 				chan hall_request_assigner.ActiveElevator, 
 			FSMHallOrderCompleteCh 			chan<- elevio.ButtonEvent, 
 			FSMAssignedHallRequestsCh 		<-chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 
 			CabCopyCh 						chan<- [elevio.N_Floors][elevio.N_Buttons]bool, 
 			InitCabCopy						[elevio.N_Floors]bool, 
-			EB_StuckCh 						chan<- bool,
+			EB_StuckCh						chan bool,
 ) {
 	var prev int = -1
 	log.Println("is in fsm")
@@ -205,6 +222,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 	}
 	time.Sleep(500 * time.Millisecond) // Make sure FsmOnInitBetweenFloors completes before the rest of FsmRun continues
 
+	go sendLocalStuckElevator(EB_StuckCh, FSMStateUpdateCh)
 	//log.Println("firste elev state to send floor! : ", hall_request_assigner.ActiveElevator{Elevator: elevatorState, MyAddress: network.GetLocalIPv4()}.Elevator.Floor)
 
 	for {
@@ -228,7 +246,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 				Elevator:  elevatorState,
 				MyAddress: network.GetLocalIPv4(),
 			}
-			go checkStuck(EB_StuckCh)
+			go checkStuckBetweenFloors(EB_StuckCh)
 
 			toBeSentActiveElevatorState.Elevator.Requests[buttonEvent.Floor][buttonEvent.Button] = true
 			if elevatorState.Floor != -1 { // Guarantees that FsmOnInitBetweenFloors() is completed before any button-presses are sent.
@@ -279,7 +297,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 					if AssignedHallRequests[i][j] {
 						handleRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh, CabCopyCh)
 						time.Sleep(5 * time.Millisecond)
-						go checkStuck(EB_StuckCh)
+						go checkStuckBetweenFloors(EB_StuckCh)
 					}
 				}
 			}

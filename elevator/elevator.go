@@ -30,6 +30,7 @@ type Elevator struct { // add local ip mby?
 	Requests  [elevio.N_Floors][elevio.N_Buttons]bool
 	Behaviour ElevatorBehaviour
 	Config    Config
+	Available bool
 }
 
 func ElevatorInit() Elevator {
@@ -41,5 +42,6 @@ func ElevatorInit() Elevator {
 			ClearRequestVariant: CV_InDirn,
 			DoorOpenDurationS:   3.0,
 		},
+		Available: true,
 	}
 }
