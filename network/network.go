@@ -4,6 +4,7 @@ import (
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
+	"elevator/conn"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -422,70 +423,46 @@ func StartClient(port string, msg Message) {
 	}
 }
 
-/*
-func TCPListenForNewPrimary() {
-	//listen for new primary on tcp port and accept
-}
+func UDPCheckPeerAliveStatus(port string, peerNetworkLossCh chan string) {
+	conn := conn.DialBroadcastUDP(StringPortToInt(port))
+	checkAliveStatus := make(map[string]int)
 
-func TCPListenForNewElevators(port string, listenerconnection, receiverchannels){
-	//listen for new elevators on TCP port
-	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
-	go run TCPReadElevatorStates(stateUpdateCh)
-
-	allClients := make(map[net.Conn]string)
-	newConnections := make(chan net.Conn)
-	deadConnections := make(chan net.Conn)
-	messages := make(chan connectionMsg)
-
-	go acceptConnections(connection, newConnections)
-
+	defer conn.Close()
 	for {
-		select {
-		case conn := <-newConnections:
-			addr := conn.RemoteAddr().String()
-			fmt.Printf("Accepted new client, %v\n", addr)
-			allClients[conn] = addr
-			go read(conn, messages, deadConnections)
-
-		case conn := <-deadConnections:
-			fmt.Printf("Client %v disconnected", allClients[conn])
-			delete(allClients, conn)
-
-		case message := <-messages:
-			go decodeMsg(message, rxChannels)
-		}
-	}
-}
-
-func acceptConnections(server net.Listener, newConnections chan net.Conn) {
-	for {
-		conn, err := server.Accept()
+		var buf [bufSize]byte
+		n, _, err := conn.ReadFrom(buf[:])
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error reading from UPDCheckAliveStatus: ", err)
+			continue
 		}
-		newConnections <- conn
+		peerIP := string(buf[:n])
+
+		if _, exists := checkAliveStatus[peerIP]; !exists {
+			checkAliveStatus[peerIP] = 0
+		}
+
+		log.Print("alive map: ", checkAliveStatus)
+
+		for IP, _ := range checkAliveStatus {
+			if IP != peerIP {
+				checkAliveStatus[IP]++
+			} else {
+				checkAliveStatus[IP] = 0
+			}
+		}
+
+		for IP, count := range checkAliveStatus {
+			if count > 10 {
+				//send IP on disconnected elevators channel
+				print("detected a disconnected elevator with IP: ", IP)
+				delete(checkAliveStatus, peerIP)
+				peerNetworkLossCh <- peerIP
+			}
+		}
+
+		time.Sleep(20 * time.Millisecond)
 	}
 }
-*/
-
-/*
-distribute all hall requests
-needs to receive ack from each elevator sendt to.
-probably need to give it the TCP conn array
-
-func DistributeHallRequests(assignedHallReq) {
-	//TODO: all
-}
-
-
-distribute all button lights assosiated with each hallreq at each local elevator
-needs to receive ack from each elevator sendt to.
-probably need to give it the TCP conn array.
-will need ack here aswell as hall req button lights need to be syncronized across computers
-func DistributeHallButtonLights(assignedHallReq) {
-	//TODO: all
-}
-*/
 
 func ConnectedToNetwork() bool {
 	conn, err := net.Dial("udp", "8.8.8.8:53") // (8.8.8.8 is a Google DNS)
