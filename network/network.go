@@ -359,7 +359,8 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
 			fmt.Println("Error unmarshaling generic message: ", err)
-			panic(err)
+			fmt.Println("Panic was here 1)")
+			continue
 		}
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
 		switch MessageType(genericMsg["type"].(string)) {
