@@ -330,7 +330,7 @@ func GetMapKey(ActiveElevatorMap map[string]elevator.Elevator) string {
 	return ""
 }
 
-func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.ActiveElevator) {
+func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.ActiveElevator) error {
 	myActiveElevatorMsg := MsgActiveElevator{
 		Type:    TypeActiveElevator,
 		Content: activeElevator,
@@ -340,18 +340,19 @@ func TCPSendActiveElevator(conn net.Conn, activeElevator hall_request_assigner.A
 
 	if err != nil {
 		fmt.Println("Error encoding ActiveElevator to json: ", err)
-		return
+		return err
 	}
 
 	_, err = conn.Write(data)
 	if err != nil {
 		fmt.Println("Error sending ActiveElevator: ", err)
-		return
+		return err
 	}
 	time.Sleep(50 * time.Millisecond)
+	return nil
 }
 
-func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
+func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) error {
 	myButtonEventMsg := MsgButtonEvent{
 		Type:    TypeButtonEvent,
 		Content: buttonEvent,
@@ -360,15 +361,16 @@ func TCPSendButtonEvent(conn net.Conn, buttonEvent elevio.ButtonEvent) {
 	data, err := json.Marshal(myButtonEventMsg)
 	if err != nil {
 		fmt.Println("Error encoding ButtonEvent to json: ", err)
-		return
+		return err
 	}
 
 	_, err = conn.Write(data)
 	if err != nil {
 		fmt.Println("Error sending ButtonEvent: ", err)
-		return
+		return err
 	}
 	time.Sleep(50 * time.Millisecond)
+	return nil
 }
 
 func TCPSendACK(conn net.Conn) {

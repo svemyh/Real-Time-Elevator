@@ -261,7 +261,10 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 				}
 				time.Sleep(50 * time.Millisecond)
 			*/
-			TCPSendActiveElevator(conn, stateUpdate)
+			err := TCPSendActiveElevator(conn, stateUpdate)
+			if err != nil {
+				return
+			}
 
 		case hallOrderComplete := <-FSMHallOrderCompleteCh:
 			my_ButtonEventMsg := MsgButtonEvent{
