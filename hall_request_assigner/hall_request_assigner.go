@@ -5,6 +5,7 @@ import (
 	"elevator/elevio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os/exec"
 	"runtime"
@@ -127,6 +128,8 @@ func HallRequestAssigner(ActiveElevatorsMap map[string]elevator.Elevator, Combin
 	for ip, elev := range ActiveElevatorsMap {
 		if elev.Available { // Check if the elevator is marked as available
 			filteredActiveElevatorsMap[ip] = elev
+			log.Println("FilteredActiveElevatorsMap", filteredActiveElevatorsMap)
+			log.Println("ActiveElevatorsmap", ActiveElevatorsMap) 
 		}
 	}
 

@@ -148,7 +148,7 @@ func sendStuckElevatorState(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reques
 		MyAddress: network.GetLocalIPv4(),
 	}
 	FSMStateUpdateCh <- toBeSentActiveElevatorState
-	//time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 }
 
 func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_request_assigner.ActiveElevator) {
@@ -267,13 +267,13 @@ func FSMRun(device 							elevio.ElevInputDevice,
 					fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
 					EB_StuckCh = true
 					obstructionSignal := <-device.ObstructionCh
-					//sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+					sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 					if !obstructionSignal {
 						doorIsOpen(false)
 						fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
 						EB_StuckCh = false
 						time.Sleep(100 * time.Millisecond)
-					//	sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+						sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 						//break // Should be redundant
 					}
 				}
