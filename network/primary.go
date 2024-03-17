@@ -158,14 +158,15 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 	}
 }
 
-func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
-	CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	StateUpdateCh chan hall_request_assigner.ActiveElevator,
-	HallOrderCompleteCh chan elevio.ButtonEvent,
-	DisconnectedElevatorCh chan string,
-	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	AckCh chan bool,
-	ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func PrimaryRoutine(ActiveElevatorMap 		map[string]elevator.Elevator,
+					CombinedHallRequests 	[elevio.N_Floors][elevio.N_Buttons - 1]bool,
+					StateUpdateCh 			chan hall_request_assigner.ActiveElevator,
+					HallOrderCompleteCh 	chan elevio.ButtonEvent,
+					DisconnectedElevatorCh 	chan string,
+					AssignHallRequestsCh 	chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+					AckCh 					chan bool,
+					ConsumerChannels 		map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	) {
 
 	clientTxEnable := make(chan bool)
 	clientUpdateCh := make(chan ClientUpdate)
@@ -192,13 +193,14 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 }
 
 func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
-	CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	StateUpdateCh chan hall_request_assigner.ActiveElevator,
-	HallOrderCompleteCh chan elevio.ButtonEvent,
-	DisconnectedElevatorCh chan string,
-	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	AckCh chan bool,
-	BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+						CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+						StateUpdateCh chan hall_request_assigner.ActiveElevator,
+						HallOrderCompleteCh chan elevio.ButtonEvent,
+						DisconnectedElevatorCh chan string,
+						AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+						AckCh chan bool,
+						BroadcastCombinedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	) {
 
 	BackupAddr := ""
 	var backupConn net.Conn

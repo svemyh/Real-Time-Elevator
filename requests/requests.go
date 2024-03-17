@@ -85,8 +85,8 @@ func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 }
 
 func ClearAtCurrentFloor(e 						elevator.Elevator, 
-						 FSMHallOrderCompleteCh chan elevio.ButtonEvent, 
-						 CabCopyCh 				chan [elevio.N_Floors][elevio.N_Buttons]bool,
+						 FSMHallOrderCompleteCh chan<- elevio.ButtonEvent, 
+						 CabCopyCh 				chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) elevator.Elevator { 
 	switch e.Config.ClearRequestVariant {
 	case elevator.CV_All:

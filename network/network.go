@@ -94,7 +94,15 @@ func NewElevatorSystemChannels() ElevatorSystemChannels {
 }
 
 // Alias: RunPrimaryBackup()
-func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, AckCh chan bool) {
+func InitNetwork(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator, 
+				FSMHallOrderCompleteCh 		chan elevio.ButtonEvent, 
+				StateUpdateCh 				chan hall_request_assigner.ActiveElevator, 
+				HallOrderCompleteCh 		chan elevio.ButtonEvent, 
+				DisconnectedElevatorCh 		chan string, 
+				FSMAssignedHallRequestsCh 	chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 
+				AssignHallRequestsCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 
+				AckCh 						chan bool,
+	) {
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
 	var id string
@@ -117,6 +125,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 		ActiveElevatorMap := make(map[string]elevator.Elevator)
 		ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+
 		go PrimaryRoutine(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
@@ -142,7 +151,11 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 }
 
 // Checks the event that a backup has become a new primary and wants to establish connection. This go routine should be shut down at some point
-func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPListenForNewPrimary(TCPPort string, 
+	FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, 
+	FSMHallOrderCompleteCh chan elevio.ButtonEvent, 
+	FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	) {
 	fmt.Println("- Executing TCPListenForNewPrimary()")
 	//listen for new elevators on TCP port
 	//when connection established run the go routine TCPReadElevatorStates to start reading data from the conn
@@ -189,7 +202,11 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 	}
 }
 
-func TCPDialPrimary(PrimaryAddress string, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent, FSMAssignedHallRequestsCh chan [elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPDialPrimary(PrimaryAddress 				string, 
+					FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator, 
+					FSMHallOrderCompleteCh 		chan elevio.ButtonEvent, 
+					FSMAssignedHallRequestsCh 	chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	) {
 	fmt.Println("Connecting by TCP to the address: ", PrimaryAddress)
 
 	conn, err := net.Dial("tcp", PrimaryAddress)
@@ -235,7 +252,10 @@ func RecieveAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 	}
 }
 
-func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent) {
+func sendLocalStatesToPrimaryLoop(conn 					net.Conn, 
+								  FSMStateUpdateCh 		chan hall_request_assigner.ActiveElevator, 
+								  FSMHallOrderCompleteCh 	chan elevio.ButtonEvent,
+	) {
 	fmt.Printf("sendLocalStatesToPrimaryLoop() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
 
 	defer conn.Close()
@@ -316,7 +336,9 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 }
 
 // Recieves message on AssignedHallRequestsCh and distributes said message to all consumer go-routines ConsumerAssignedHallRequestsCh
-func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, Consumers map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 
+					  Consumers map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+) {
 	for hallRequests := range AssignedHallRequestsCh {
 		for _, ch := range Consumers {
 			ch <- hallRequests
@@ -325,7 +347,11 @@ func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][e
 }
 
 // Alias: Server()
-func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string) {
+func TCPReadElevatorStates(conn net.Conn, 
+	StateUpdateCh chan hall_request_assigner.ActiveElevator, 
+	HallOrderCompleteCh chan elevio.ButtonEvent, 
+	DisconnectedElevatorCh chan string,
+) {
 	//TODO:Read the states and store in a buffer
 	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
