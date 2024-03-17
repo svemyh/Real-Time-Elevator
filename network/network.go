@@ -102,6 +102,7 @@ func InitNetwork(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator,
 				FSMAssignedHallRequestsCh 	chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 
 				AssignHallRequestsCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 
 				AckCh 						chan bool,
+				EB_StuckCh					<-chan bool,
 	) {
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)
@@ -125,7 +126,7 @@ func InitNetwork(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator,
 		var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 		ActiveElevatorMap := make(map[string]elevator.Elevator)
 		ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
-
+		go updateStuckElevators(ActiveElevatorMap, EB_StuckCh)
 		go PrimaryRoutine(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
@@ -199,6 +200,20 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 			continue
 		}
 		return conn, nil
+	}
+}
+
+func updateStuckElevators(ActiveElevatorMap map[string]elevator.Elevator, EB_StuckCh <-chan bool) {
+	for {
+		select {
+		case isStuck := <-EB_StuckCh:
+			elevator, ok := ActiveElevatorMap[GetMapKey(ActiveElevatorMap)]
+			if ok {
+				// Update the Available field based on EB_StuckCh value
+				elevator.Available = isStuck
+				ActiveElevatorMap[GetMapKey(ActiveElevatorMap)] = elevator
+			}
+		}
 	}
 }
 

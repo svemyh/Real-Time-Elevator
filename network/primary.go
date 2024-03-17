@@ -224,6 +224,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
+
 		case stateUpdate := <-StateUpdateCh:
 			fmt.Println("StateUpdate: ", stateUpdate)
 			ActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator

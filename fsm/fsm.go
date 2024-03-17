@@ -139,7 +139,7 @@ func handleDoorTimeout(FSMHallOrderCompleteCh 	chan<- elevio.ButtonEvent,
 	}
 }
 
-func checkStuck(EB_StuckCh chan<- bool) {
+func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 	//log.Println("Starting checkStuck.")
 
 	var lastFloor int = -1
@@ -228,7 +228,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 				Elevator:  elevatorState,
 				MyAddress: network.GetLocalIPv4(),
 			}
-			go checkStuck(EB_StuckCh)
+			go checkStuckBetweenFloors(EB_StuckCh)
 
 			toBeSentActiveElevatorState.Elevator.Requests[buttonEvent.Floor][buttonEvent.Button] = true
 			if elevatorState.Floor != -1 { // Guarantees that FsmOnInitBetweenFloors() is completed before any button-presses are sent.
@@ -279,7 +279,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 					if AssignedHallRequests[i][j] {
 						handleRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh, CabCopyCh)
 						time.Sleep(5 * time.Millisecond)
-						go checkStuck(EB_StuckCh)
+						go checkStuckBetweenFloors(EB_StuckCh)
 					}
 				}
 			}

@@ -38,7 +38,7 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
+	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh, EB_StuckCh) // Alias: RunPrimaryBackup()
 	// REFACTOR: Can be moved to InitNetwork()?
 
 	//run local elevator
