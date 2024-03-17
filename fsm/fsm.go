@@ -16,6 +16,7 @@ var (
 	elevatorState elevator.Elevator
  	isDoorOpen bool
 	doorOpenDurationS int64 = elevator.ElevatorInit().Config.DoorOpenDurationS
+	EB_StuckCh bool = false
 )
 
 func init() {
@@ -139,7 +140,19 @@ func handleDoorTimeout(FSMHallOrderCompleteCh 	chan<- elevio.ButtonEvent,
 	}
 }
 
-func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
+func sendStuckElevatorState(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_request_assigner.ActiveElevator) {
+	log.Println("Updated stuck elevator")
+	elevatorState.Available = EB_StuckCh
+	toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
+		Elevator:  elevatorState,
+		MyAddress: network.GetLocalIPv4(),
+	}
+	FSMStateUpdateCh <- toBeSentActiveElevatorState
+	time.Sleep(300 * time.Millisecond)
+	
+}
+
+func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_request_assigner.ActiveElevator) {
 	//log.Println("Starting checkStuck.")
 
 	var lastFloor int = -1
@@ -153,7 +166,7 @@ func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 		case <-stuckTimer.C:
 			if elevatorState.Behaviour == elevator.EB_Moving && lastFloor != -1 {
 				log.Printf("Elevator is stuck at floor: %d\n", lastFloor)
-				EB_StuckCh <- true
+				EB_StuckCh = true
 				stuckTimer.Reset(stuckDuration)
 			}
 
@@ -164,10 +177,11 @@ func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 					lastFloor = currentFloor
 					stuckTimer.Reset(stuckDuration)
 					log.Printf("Elevator moved to floor: %d\n", currentFloor)
-					EB_StuckCh <- false
+					EB_StuckCh = false
 				}
 			}
 		}
+		sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 
 		if requests.HasRequests(elevatorState) {
 			log.Println("Elevator has no more requests. Not checking for stuck condition.")
@@ -183,7 +197,6 @@ func FSMRun(device 							elevio.ElevInputDevice,
 			FSMAssignedHallRequestsCh 		<-chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 
 			CabCopyCh 						chan<- [elevio.N_Floors][elevio.N_Buttons]bool, 
 			InitCabCopy						[elevio.N_Floors]bool, 
-			EB_StuckCh 						chan<- bool,
 ) {
 	var prev int = -1
 	log.Println("is in fsm")
@@ -229,7 +242,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 				Elevator:  elevatorState,
 				MyAddress: network.GetLocalIPv4(),
 			}
-			go checkStuckBetweenFloors(EB_StuckCh)
+			go checkStuckBetweenFloors(EB_StuckCh, FSMStateUpdateCh)
 
 			toBeSentActiveElevatorState.Elevator.Requests[buttonEvent.Floor][buttonEvent.Button] = true
 			if elevatorState.Floor != -1 { // Guarantees that FsmOnInitBetweenFloors() is completed before any button-presses are sent.
@@ -252,18 +265,21 @@ func FSMRun(device 							elevio.ElevInputDevice,
 				for obstructionSignal && isDoorOpen {
 					doorIsOpen(true)
 					fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
-					EB_StuckCh <- true
+					EB_StuckCh = true
 					obstructionSignal := <-device.ObstructionCh
 					if !obstructionSignal {
 						doorIsOpen(false)
 						fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
-						EB_StuckCh <- false
+						EB_StuckCh = false
 						time.Sleep(500 * time.Millisecond)
 						//break // Should be redundant
 					}
 				}
 				doorIsOpen(false)
 				fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
+				
+				sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+
 				time.Sleep(500 * time.Millisecond)
 			}
 
@@ -280,7 +296,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 					if AssignedHallRequests[i][j] {
 						handleRequestButtonPress(i, elevio.Button(j), FSMHallOrderCompleteCh, CabCopyCh)
 						time.Sleep(5 * time.Millisecond)
-						go checkStuckBetweenFloors(EB_StuckCh)
+						go checkStuckBetweenFloors(EB_StuckCh, FSMStateUpdateCh)
 					}
 				}
 			}
