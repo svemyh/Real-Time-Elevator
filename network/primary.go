@@ -149,7 +149,7 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 			continue
 		}
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
-		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
 		ConsumerChannels[conn] = personalAssignedHallRequestsCh
 		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
 
