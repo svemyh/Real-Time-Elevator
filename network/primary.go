@@ -214,7 +214,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 
 	for {
 		// Guarantees that ActiveElevatorMap contains Primary
-		if _, exists := ActiveElevatorMap[GetLocalIPv4()]; !exists && len(ActiveElevatorMap) > 0 { // TODO: add case for if len=0
+		if _, exists := ActiveElevatorMap[GetLocalIPv4()]; !exists && len(ActiveElevatorMap) == 0 { // TODO: add case for if len=0
 			fmt.Println("Primary is not in ActiveElevatorMap. Adding it.")
 			StateUpdateCh <- hall_request_assigner.ActiveElevator{
 				Elevator:  ActiveElevatorMap[GetMapKey(ActiveElevatorMap)],
@@ -237,7 +237,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		case stateUpdate := <-StateUpdateCh:
 			fmt.Println("StateUpdate: ", stateUpdate)
 			ActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
-			if len(filteredActiveElevatorMap) >= 2 {
+			if len(filteredActiveElevatorMap) >= 1 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
 					fmt.Println("Backup does not exists yet. Initializing it..")
 					BackupAddr = GetBackupAddress(filteredActiveElevatorMap)
