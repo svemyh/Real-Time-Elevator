@@ -504,31 +504,30 @@ func SendHeartbeatsV0(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan s
 // Continously monitors that a net.Conn is still alive
 func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) {
 	timestampCh := make(chan string, 1024)
+	connIP := conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
-	timestamp := time.Now().Format("15:04:05")
+	timestamp := connIP + "-" + time.Now().Format("15:04:05")
 	timestampCh <- timestamp
 
 	fmt.Println("INIT SendHeartbeats() -  timestamp:", timestamp)
+	fmt.Println("____-----___--- 1)", conn.RemoteAddr().(*net.TCPAddr).IP.String()+"-"+time.Now().Format("15:04:05")) //Bingo
+	fmt.Println("____-----___--- 1)", conn.LocalAddr().(*net.TCPAddr).IP.String()+"-"+time.Now().Format("15:04:05"))
+	fmt.Println("____-----___--- 2)", conn.LocalAddr().String()+"-"+time.Now().Format("15:04:05"))
+	fmt.Println("____-----___--- 3)", conn.RemoteAddr().String()+"-"+time.Now().Format("15:04:05"))
 	for {
 		select {
-		case t := <-ReadHeartbeatsCh:
+		case t := <-ReadHeartbeatsCh: // Messages that primary recieve
 			if t == timestamp {
 				fmt.Println("Recieved timestamp as ACK: ", t)
-				timestamp = time.Now().Format("15:04:05")
-				timestampCh <- timestamp
+				timestamp = connIP + "-" + time.Now().Format("15:04:05")
 			}
-		case tt := <-timestampCh:
-			fmt.Println("tt := <-timestampCh recieved: ", tt)
-			timestamp = tt
-			time.Sleep(750 * time.Millisecond)
 
 		case <-time.After(5 * time.Second):
 			fmt.Println("____-----_____-----_____---- Heartbeat not acknowledged in time.")
 			errCh <- errors.New("heartbeat timeout: connection might be broken")
-			close(timestampCh)
 			return
 
-		default:
+		default: // Sending heartbeat to individual elevators
 			TimestampMsg := MsgString{
 				Type:    TypeTimestamp,
 				Content: timestamp,
