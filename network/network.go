@@ -4,6 +4,7 @@ import (
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
+	"elevator/conn"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -20,6 +21,7 @@ var TCP_LISTEN_PORT string = ":14279"
 var HALL_LIGHTS_PORT string = ":14274"
 var TCP_BACKUP_PORT string = ":14275"
 var TCP_NEW_PRIMARY_LISTEN_PORT string = ":14276"
+var UDP_ALIVE_PORT string = ":17721"
 
 type MessageType string
 
@@ -483,6 +485,58 @@ func DistributeHallButtonLights(assignedHallReq) {
 	//TODO: all
 }
 */
+func UDPBroadcastAlive(p string) {
+
+	port := StringPortToInt(p)
+	key := GetLocalIPv4()
+
+	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
+
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		conn.WriteTo([]byte(key), addr)
+		fmt.Println("Broadcasting status!")
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+
+func UDPCheckPeerAliveStatus(port string) {
+	conn := conn.DialBroadcastUDP(StringPortToInt(port))
+
+	defer conn.Close()
+	for {
+		var buf [bufSize]byte
+		n, _, err := conn.ReadFrom(buf[:])
+		if err != nil {
+			fmt.Println("Error reading from UPDCheckAliveStatus: ", err)
+			continue
+		}
+
+		checkAliveStatus := make(map[string]int)
+		peerIP := string(buf[:n])
+		checkAliveStatus[peerIP] = 0
+
+		for IP, _ := range checkAliveStatus {
+			if IP != peerIP {
+				checkAliveStatus[IP]++
+			}
+		}
+
+		for IP, count := range checkAliveStatus {
+			if count > 10 {
+				//send IP on disconnected elevators channel
+				print("detected a disconnected elevator with IP: ", IP)
+			}
+		}
+
+		time.Sleep(20 * time.Millisecond)
+		}
+}
 
 func ConnectedToNetwork() bool {
 	conn, err := net.Dial("udp", "8.8.8.8:53") // (8.8.8.8 is a Google DNS)

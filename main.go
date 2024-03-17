@@ -46,6 +46,9 @@ func main() {
 	go network.RestartOnReconnect(CabCopyCh)
 
 	go network.UDPReadCombinedHallRequests(network.HALL_LIGHTS_PORT)
+	go network.UDPBroadcastAlive(network.UDP_ALIVE_PORT)
+
+
 
 	//establishConnectionWithPrimary() // TCP
 
