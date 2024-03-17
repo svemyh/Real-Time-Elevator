@@ -16,12 +16,12 @@ type ClearRequestVariant int
 
 const (
 	CV_All ClearRequestVariant = iota
-	CV_InDoorn
+	CV_InDirn
 )
 
 type Config struct {
 	ClearRequestVariant ClearRequestVariant
-	DoorOpenDurationS   float64
+	DoorOpenDurationS   int64
 }
 
 type Elevator struct { // add local ip mby?
@@ -38,7 +38,7 @@ func ElevatorInit() Elevator {
 		Dirn:      elevio.D_Stop,
 		Behaviour: EB_Idle,
 		Config: Config{
-			ClearRequestVariant: CV_InDoorn,
+			ClearRequestVariant: CV_InDirn,
 			DoorOpenDurationS:   3.0,
 		},
 	}

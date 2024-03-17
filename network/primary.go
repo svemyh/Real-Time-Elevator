@@ -302,7 +302,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				go func() {
 					select {
 					case <-AckCh:
-						fmt.Println("ACK received: In case stateUpdate")
+						fmt.Println("ACK received: In case disconnectedElevator")
 						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
@@ -439,6 +439,7 @@ func UDPReadCombinedHallRequests(port string) {
 
 	defer conn.Close()
 	for {
+		time.Sleep(50 * time.Millisecond)
 		var buf [bufSize]byte
 		n, _, err := conn.ReadFrom(buf[:])
 		if err != nil {
@@ -449,7 +450,7 @@ func UDPReadCombinedHallRequests(port string) {
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
 			fmt.Println("Error unmarshaling generic message: ", err)
-			panic(err)
+			fmt.Println("Content of faulty generic message:", genericMsg)
 		}
 
 		switch MessageType(genericMsg["type"].(string)) {
@@ -464,7 +465,6 @@ func UDPReadCombinedHallRequests(port string) {
 		default:
 			fmt.Println("Unknown message type recieved")
 		}
-		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -503,15 +503,17 @@ func TCPReadACK(conn net.Conn, DisconnectedElevatorCh chan string, AckCh chan bo
 		// Decoding said data into a json-style object
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
-			fmt.Println("Error unmarshaling generic message: ", err)
-			panic(err)
+			fmt.Println("TCPReadACK() - Error unmarshaling generic message: ", err)
+			fmt.Println("Content of faulty generic message:", genericMsg)
+			DisconnectedElevatorCh <- conn.RemoteAddr().String()
 		}
 		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
 		switch MessageType(genericMsg["type"].(string)) {
 		case TypeACK:
 			var msg MsgACK
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err)
+				fmt.Println("Content of faulty TypeACK message:", msg)
+				DisconnectedElevatorCh <- conn.RemoteAddr().String()
 			}
 			AckCh <- msg.Content
 
