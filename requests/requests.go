@@ -62,22 +62,22 @@ func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehavio
 func ShouldStop(e elevator.Elevator) bool {
 	switch e.Dirn {
 	case elevio.D_Down:
-		return e.Requests[e.Floor][elevio.B_HallDown] || e.Requests[e.Floor][elevio.B_Cab] || !requestsBelow(e)
+		return e.Requests[e.Floor][elevio.BT_HallDown] || e.Requests[e.Floor][elevio.BT_Cab] || !requestsBelow(e)
 	case elevio.D_Up:
-		return e.Requests[e.Floor][elevio.B_HallUp] || e.Requests[e.Floor][elevio.B_Cab] || !requestsAbove(e)
+		return e.Requests[e.Floor][elevio.BT_HallUp] || e.Requests[e.Floor][elevio.BT_Cab] || !requestsAbove(e)
 	default:
 		return true
 	}
 }
 
-func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Button) bool { 
+func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.ButtonType) bool { 
 	switch e.Config.ClearRequestVariant {
 	case elevator.CV_All:
 		return e.Floor == btnFloor
 	case elevator.CV_InDirn:
-		return e.Floor == btnFloor && ((e.Dirn == elevio.D_Up && btnType == elevio.B_HallUp) ||
-			(e.Dirn == elevio.D_Down && btnType == elevio.B_HallDown) ||
-			e.Dirn == elevio.D_Stop || btnType == elevio.B_Cab)
+		return e.Floor == btnFloor && ((e.Dirn == elevio.D_Up && btnType == elevio.BT_HallUp) ||
+			(e.Dirn == elevio.D_Down && btnType == elevio.BT_HallDown) ||
+			e.Dirn == elevio.D_Stop || btnType == elevio.BT_Cab)
 	default:
 		return false
 	}
@@ -92,33 +92,33 @@ func ClearAtCurrentFloorAndSendCompletedOrder(e 						elevator.Elevator,
 		for button := 0; button < elevio.N_Buttons; button++ { 
 			e.Requests[e.Floor][button] = false
 		}
-		FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
-		FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
+		FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallUp)}
+		FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallDown)}
 
 	case elevator.CV_InDirn:
 		e.Requests[e.Floor][elevio.BT_Cab] = false
 		switch e.Dirn {
 		case elevio.D_Up:
-			if !requestsAbove(e) && !e.Requests[e.Floor][elevio.B_HallUp] {
-				e.Requests[e.Floor][elevio.B_HallDown] = false
-				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
+			if !requestsAbove(e) && !e.Requests[e.Floor][elevio.BT_HallUp] {
+				e.Requests[e.Floor][elevio.BT_HallDown] = false
+				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallDown)}
 			}
-			e.Requests[e.Floor][elevio.B_HallUp] = false
-			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
+			e.Requests[e.Floor][elevio.BT_HallUp] = false
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallUp)}
 		case elevio.D_Down:
-			if !requestsBelow(e) && !e.Requests[e.Floor][elevio.B_HallDown] {
-				e.Requests[e.Floor][elevio.B_HallUp] = false
-				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
+			if !requestsBelow(e) && !e.Requests[e.Floor][elevio.BT_HallDown] {
+				e.Requests[e.Floor][elevio.BT_HallUp] = false
+				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallUp)}
 			}
-			e.Requests[e.Floor][elevio.B_HallDown] = false
-			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
+			e.Requests[e.Floor][elevio.BT_HallDown] = false
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallDown)}
 		case elevio.D_Stop:
 			fallthrough
 		default:
-			e.Requests[e.Floor][elevio.B_HallUp] = false
-			e.Requests[e.Floor][elevio.B_HallDown] = false
-			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
-			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
+			e.Requests[e.Floor][elevio.BT_HallUp] = false
+			e.Requests[e.Floor][elevio.BT_HallDown] = false
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallUp)}
+			FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.BT_HallDown)}
 		}
 	}
 	CabCopyCh <- e.Requests

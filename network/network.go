@@ -502,7 +502,7 @@ func RestartOnReconnect(CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) 
 		select {
 		case requestCopy := <-CabCopyCh:
 			for floor := 0; floor < elevio.N_Floors; floor++ {
-				CabCopy[floor] = requestCopy[floor][elevio.B_Cab]
+				CabCopy[floor] = requestCopy[floor][elevio.BT_Cab]
 			}
 
 			fmt.Println("copy cab is: ", elevio.CabArrayToString(CabCopy))
