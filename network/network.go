@@ -1,10 +1,10 @@
 package network
 
 import (
+	"elevator/conn"
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
-	"elevator/conn"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -119,7 +119,8 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 		ActiveElevatorMap := make(map[string]elevator.Elevator)
 		ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
-		go PrimaryRoutine(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels)
+		PeerConsumerChannels := make(map[net.Conn]chan string)
+		go PrimaryRoutine(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels, PeerConsumerChannels)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
@@ -318,16 +319,24 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 }
 
 // Recieves message on AssignedHallRequestsCh and distributes said message to all consumer go-routines ConsumerAssignedHallRequestsCh
-func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, Consumers map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
-	for hallRequests := range AssignedHallRequestsCh {
-		for _, ch := range Consumers {
-			ch <- hallRequests
+func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, peerNetworkLossCh chan string, Consumers map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, PeersConsumer map[net.Conn]chan string) {
+	for {
+		select {
+		case hallRequests := <-AssignedHallRequestsCh:
+			for _, ch := range Consumers {
+				ch <- hallRequests
+			}
+		case ip := <-peerNetworkLossCh:
+			fmt.Println("hello")
+			for _, ch := range PeersConsumer {
+				ch <- ip
+			}
 		}
 	}
 }
 
 // Alias: Server()
-func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string) {
+func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, personalDisconnectedPeerCh chan string) {
 	//TODO:Read the states and store in a buffer
 	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
@@ -341,50 +350,57 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 	defer conn.Close()
 
 	for {
-		// Create buffer and read data into the buffer using conn.Read()
-		var buf [bufSize]byte
-		n, err := conn.Read(buf[:])
-		if err != nil {
-			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
-			DisconnectedElevatorCh <- conn.RemoteAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
+		select{
+		case peerDisconnectedIP := <- personalDisconnectedPeerCh:
+			DisconnectedElevatorCh <- peerDisconnectedIP ///OOOOBBSS can rework disconnectedpeerchannel to just be disconnected elevator chan. Mulig at alle conns får denne updaten og og ikke kun 1
 			break
-			//conn.Close()
-			//panic(err)
-		}
-
-		// Decoding said data into a json-style object
-		var genericMsg map[string]interface{}
-		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
-			fmt.Println("Error unmarshaling generic message: ", err)
-			panic(err)
-		}
-		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
-		switch MessageType(genericMsg["type"].(string)) {
-		case TypeActiveElevator:
-			var msg MsgActiveElevator
-			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
-			}
-			fmt.Printf("Received ActiveElevator object: %+v\n", msg)
-			StateUpdateCh <- msg.Content
-
-		case TypeButtonEvent:
-			var msg MsgButtonEvent
-			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
-			}
-			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
-			HallOrderCompleteCh <- msg.Content
-		case TypeString:
-			var msg MsgString
-			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
-			}
-			fmt.Printf("Received string object: %+v\n", msg)
-			DisconnectedElevatorCh <- msg.Content
 
 		default:
-			fmt.Println("Unknown message type")
+			// Create buffer and read data into the buffer using conn.Read()
+			var buf [bufSize]byte
+			n, err := conn.Read(buf[:])
+			if err != nil {
+				// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
+				DisconnectedElevatorCh <- conn.RemoteAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
+				break
+				//conn.Close()
+				//panic(err)
+			}
+
+			// Decoding said data into a json-style object
+			var genericMsg map[string]interface{}
+			if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
+				fmt.Println("Error unmarshaling generic message: ", err)
+				panic(err)
+			}
+			// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
+			switch MessageType(genericMsg["type"].(string)) {
+			case TypeActiveElevator:
+				var msg MsgActiveElevator
+				if err := json.Unmarshal(buf[:n], &msg); err != nil {
+					panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				}
+				fmt.Printf("Received ActiveElevator object: %+v\n", msg)
+				StateUpdateCh <- msg.Content
+
+			case TypeButtonEvent:
+				var msg MsgButtonEvent
+				if err := json.Unmarshal(buf[:n], &msg); err != nil {
+					panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				}
+				fmt.Printf("Received ButtonEvent object: %+v\n", msg)
+				HallOrderCompleteCh <- msg.Content
+			case TypeString:
+				var msg MsgString
+				if err := json.Unmarshal(buf[:n], &msg); err != nil {
+					panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				}
+				fmt.Printf("Received string object: %+v\n", msg)
+				DisconnectedElevatorCh <- msg.Content
+
+			default:
+				fmt.Println("Unknown message type")
+			}
 		}
 	}
 }
@@ -472,18 +488,18 @@ distribute all hall requests
 needs to receive ack from each elevator sendt to.
 probably need to give it the TCP conn array
 
-func DistributeHallRequests(assignedHallReq) {
-	//TODO: all
-}
-
+	func DistributeHallRequests(assignedHallReq) {
+		//TODO: all
+	}
 
 distribute all button lights assosiated with each hallreq at each local elevator
 needs to receive ack from each elevator sendt to.
 probably need to give it the TCP conn array.
 will need ack here aswell as hall req button lights need to be syncronized across computers
-func DistributeHallButtonLights(assignedHallReq) {
-	//TODO: all
-}
+
+	func DistributeHallButtonLights(assignedHallReq) {
+		//TODO: all
+	}
 */
 func UDPBroadcastAlive(p string) {
 
@@ -499,14 +515,14 @@ func UDPBroadcastAlive(p string) {
 
 	for {
 		conn.WriteTo([]byte(key), addr)
-		fmt.Println("Broadcasting status!")
+		//fmt.Println("Broadcasting status!")
 		time.Sleep(20 * time.Millisecond)
 	}
 }
 
-
-func UDPCheckPeerAliveStatus(port string) {
+func UDPCheckPeerAliveStatus(port string, peerNetworkLossCh chan string) {
 	conn := conn.DialBroadcastUDP(StringPortToInt(port))
+	checkAliveStatus := make(map[string]int)
 
 	defer conn.Close()
 	for {
@@ -516,14 +532,19 @@ func UDPCheckPeerAliveStatus(port string) {
 			fmt.Println("Error reading from UPDCheckAliveStatus: ", err)
 			continue
 		}
-
-		checkAliveStatus := make(map[string]int)
 		peerIP := string(buf[:n])
-		checkAliveStatus[peerIP] = 0
+
+		if _, exists := checkAliveStatus[peerIP]; !exists {
+			checkAliveStatus[peerIP] = 0
+		}
+
+		log.Print("alive map: ", checkAliveStatus)
 
 		for IP, _ := range checkAliveStatus {
 			if IP != peerIP {
 				checkAliveStatus[IP]++
+			} else {
+				checkAliveStatus[IP] = 0
 			}
 		}
 
@@ -531,11 +552,13 @@ func UDPCheckPeerAliveStatus(port string) {
 			if count > 10 {
 				//send IP on disconnected elevators channel
 				print("detected a disconnected elevator with IP: ", IP)
+				delete(checkAliveStatus, peerIP)
+				peerNetworkLossCh <- peerIP
 			}
 		}
 
 		time.Sleep(20 * time.Millisecond)
-		}
+	}
 }
 
 func ConnectedToNetwork() bool {

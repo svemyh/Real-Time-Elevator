@@ -130,7 +130,7 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	}
 }
 
-func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, peerNetworkLossCh chan string, ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, PeersConsumerChannels map[net.Conn]chan string) {
 	ls, err := net.Listen("tcp", TCPPort)
 	if err != nil {
 		fmt.Println("The connection failed. Error:", err)
@@ -140,7 +140,7 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 	fmt.Println("Primary is listening for new connections to port:", TCPPort)
 
 	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
-	go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
+	go StartBroadcaster(AssignedHallRequestsCh, peerNetworkLossCh, ConsumerChannels, PeersConsumerChannels)
 
 	for {
 		conn, err := ls.Accept()
@@ -150,10 +150,12 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 		}
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
 		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+		personalDisconnectedPeerCh := make(chan string)
 		ConsumerChannels[conn] = personalAssignedHallRequestsCh
+		PeersConsumerChannels[conn] = personalDisconnectedPeerCh 
 		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
 
-		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
+		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, personalDisconnectedPeerCh)
 		time.Sleep(100 * time.Millisecond)
 	}
 }
@@ -165,31 +167,19 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	AckCh chan bool,
-	ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
-
+	ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	PeersConsumerChannels map[net.Conn]chan string) {
+	
 	clientTxEnable := make(chan bool)
 	clientUpdateCh := make(chan ClientUpdate)
-	helloRx := make(chan ElevatorSystemChannels)
 	BroadcastCombinedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
-	
-	go UDPCheckPeerAliveStatus(UDP_ALIVE_PORT)
+	PeerNetworkLossCh := make(chan string)
+
+	go UDPCheckPeerAliveStatus(UDP_ALIVE_PORT, PeerNetworkLossCh)
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)
 	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                                     //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, ConsumerChannels) //Continously listen if new elevator entring networks is trying to establish connection
+	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, PeerNetworkLossCh, ConsumerChannels, PeersConsumerChannels) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, BroadcastCombinedHallRequestsCh)
-
-	for {
-		select {
-		case c := <-clientUpdateCh:
-			fmt.Printf("Client update:\n")
-			fmt.Printf("  Clients:    %q\n", c.Client)
-			fmt.Printf("  New:      %q\n", c.New)
-			fmt.Printf("  Lost:     %q\n", c.Lost)
-
-		case a := <-helloRx:
-			fmt.Printf("Received: %#v\n", a)
-		}
-	}
 }
 
 func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,

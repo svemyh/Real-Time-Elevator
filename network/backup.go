@@ -36,8 +36,9 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
 	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
 	BackupDisconnectedElevatorCh := make(chan string)
+	BackupPeerLostCh := make(chan string) //OOOOBBBBSSS rework disconnected and peer lost into one
 
-	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh)
+	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh, BackupPeerLostCh)
 
 	for {
 		select {
@@ -117,6 +118,7 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 
 	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
 	ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+	PeerConsumerChannels := make(map[net.Conn]chan string)
 	//go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
 
 	//TCPDialAsPrimary
@@ -141,5 +143,5 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 
 	time.Sleep(1500 * time.Millisecond)
 
-	PrimaryRoutine(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels)
+	PrimaryRoutine(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels, PeerConsumerChannels)
 }
