@@ -13,14 +13,6 @@ const (
 	D_Up   Dirn = 1
 )
 
-type Button int
-
-const (
-	B_HallUp   Button = 0
-	B_HallDown Button = 1
-	B_Cab      Button = 2
-)
-
 type ButtonType int
 
 const (
