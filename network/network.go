@@ -5,6 +5,7 @@ import (
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -35,6 +36,7 @@ const (
 	TypeString               MessageType = "string"
 	TypeCombinedHallRequests MessageType = "CombinedHallRequests"
 	TypePing                 MessageType = "PING"
+	TypeTimestamp            MessageType = "Timestamp"
 )
 
 type Message interface{}
@@ -49,7 +51,7 @@ type MsgButtonEvent struct {
 	Content elevio.ButtonEvent "json:content" // refactor: change Content to antother name? Then go compiler stops complaining
 }
 
-type MsgACK struct {
+type MsgACK struct { // TODO: Refactor to simply MsgString - is used in two or more different contexts
 	Type    MessageType `json:"type"`
 	Content bool        "json:content"
 }
@@ -59,12 +61,17 @@ type MsgString struct {
 	Content string      "json:content"
 }
 
-type MsgCombinedHallRequests struct {
+type MsgCombinedHallRequests struct { // TODO: Refactor to simply MsgHallRequests - is used in two or more different contexts
 	Type    MessageType                                 `json:"type"`
 	Content [elevio.N_Floors][elevio.N_Buttons - 1]bool "json:content"
 }
 
-type MsgPing struct {
+type MsgPing struct { // TODO: Refactor to simply MsgString - is used in two or more different contexts
+	Type    MessageType `json:"type"`
+	Content string      "json:content"
+}
+
+type MsgTimestamp struct { // TODO: Refactor to simply MsgString - is used in two or more different contexts
 	Type    MessageType `json:"type"`
 	Content string      "json:content"
 }
@@ -376,13 +383,14 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 }
 
 // Distributes assigned hall requests out to the individual FSMs. Sends to TCPReadAssignedHallRequests().
-func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, DisconnectedElevatorCh chan string) {
+func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, DisconnectedElevatorCh chan string, ReadHeartbeatsCh chan string) {
 	defer conn.Close()
 	// NB: Replaces TCPWriteElevatorStates
 	// TODO: Package content into json of type MsgCombinedElevatorRequests before sending
 	// TODO: Add a go-routine for checking if conn is alive by sending PINGs
 	errCh := make(chan error)
-	go SendHeartbeats(conn, errCh)
+
+	go SendHeartbeats(conn, errCh, ReadHeartbeatsCh)
 	for {
 		select {
 		case assignedHallRequests := <-personalAssignedHallRequestsCh:
@@ -418,30 +426,57 @@ func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh 
 }
 
 // Continously monitors that a net.Conn is still alive
-func SendHeartbeats(conn net.Conn, errCh chan<- error) {
+func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) {
+	timestamp := time.Now().Format("15:04:05")
+	timestampCh := make(chan string, 1024)
+	timestampCh <- timestamp
+	fmt.Println("INIT SendHeartbeats() -  timestamp:", timestamp)
+
+	go func(timestampCh chan string, errCh chan<- error) {
+		for {
+			select {
+			case t := <-timestampCh:
+				fmt.Println("t := <-timestampCh recieved: ", t)
+				timestamp = t
+				time.Sleep(750 * time.Millisecond)
+			default:
+				TimestampMsg := MsgString{
+					Type:    TypeTimestamp,
+					Content: timestamp,
+				}
+				data, err := json.Marshal(TimestampMsg)
+				if err != nil {
+					fmt.Printf("Failed to encode MsgString to json: %v\n", err)
+					errCh <- err
+					return
+				}
+				_, err = conn.Write(data)
+				if err != nil {
+					fmt.Printf("Failed to send heartbeat: %v\n", err)
+					errCh <- err
+					return
+				}
+				fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
+				time.Sleep(750 * time.Millisecond) // Try reducing this to minimal possible value.
+			}
+		}
+	}(timestampCh, errCh)
+
 	for {
-		conn.SetWriteDeadline(time.Now().Add(10 * time.Second)) // Adjust to estimated max waiting time for KCP using 35% packetloss
+		select {
+		case t := <-ReadHeartbeatsCh:
+			if t == timestamp {
+				fmt.Println("Recieved timestamp as ACK: ", t)
+				timestamp = time.Now().Format("15:04:05")
+				timestampCh <- timestamp
+			}
 
-		ping := MsgPing{
-			Type:    TypePing,
-			Content: "PING",
-		}
-
-		data, err := json.Marshal(ping)
-		if err != nil {
-			fmt.Printf("Failed to encode MsgPing to json: %v\n", err)
-			errCh <- err
+		case <-time.After(3 * time.Second):
+			fmt.Println("Heartbeat not acknowledged in time.")
+			errCh <- errors.New("heartbeat timeout: connection might be broken")
+			close(timestampCh)
 			return
 		}
-
-		_, err = conn.Write(data)
-		if err != nil {
-			fmt.Printf("Failed to send heartbeat: %v\n", err)
-			errCh <- err
-			return
-		}
-		fmt.Println(" -- SendHeartbeats sent ", ping, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
-		time.Sleep(1 * time.Second) // Try reducing this to minimal possible value.
 	}
 }
 
@@ -455,7 +490,7 @@ func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][e
 }
 
 // Alias: Server()
-func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string) {
+func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, ReadHeartbeatsCh chan string) {
 	//TODO:Read the states and store in a buffer
 	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
 	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
@@ -516,6 +551,13 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
 			fmt.Println("TCPReadElevatorStates() - Recieved PING: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
+		case TypeTimestamp:
+			var msg MsgString
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+			}
+			fmt.Println("TCPReadElevatorStates() - Recieved TypeTimestamp: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
+			ReadHeartbeatsCh <- msg.Content
 		default:
 			fmt.Println("Unknown message type")
 		}
