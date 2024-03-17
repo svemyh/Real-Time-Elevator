@@ -261,6 +261,9 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
+					for ip, elev := range ActiveElevatorMap {
+						TCPSendActiveElevator(backupConn, hall_request_assigner.ActiveElevator{Elevator: elev, MyAddress: ip})
+					}
 				}
 				TCPSendActiveElevator(backupConn, stateUpdate)
 				go func() {
@@ -281,8 +284,6 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 
 		case completedOrder := <-HallOrderCompleteCh:
 			fmt.Println("\n---- Order completed at floor:", completedOrder)
-			CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
-			BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
@@ -290,12 +291,17 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
+					for ip, elev := range ActiveElevatorMap {
+						TCPSendActiveElevator(backupConn, hall_request_assigner.ActiveElevator{Elevator: elev, MyAddress: ip})
+					}
 				}
 				TCPSendButtonEvent(backupConn, completedOrder)
 				go func() {
 					select {
 					case <-AckCh:
 						fmt.Println("ACK received: In case completedOrder")
+						CombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
+						BroadcastCombinedHallRequestsCh <- CombinedHallRequests
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case completedOrder")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
@@ -325,6 +331,9 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
+					for ip, elev := range ActiveElevatorMap {
+						TCPSendActiveElevator(backupConn, hall_request_assigner.ActiveElevator{Elevator: elev, MyAddress: ip})
+					}
 				}
 
 				TCPSendString(backupConn, disconnectedElevator) // Gives notice to backup of disconnected elevator
