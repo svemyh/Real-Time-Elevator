@@ -81,7 +81,7 @@ func CheckPrimaryAlive(PrimaryDeadCh chan bool) {
 
 	conn := conn.DialBroadcastUDP(StringPortToInt(DETECTION_PORT))
 
-	conn.SetReadDeadline(time.Now().Add(udpInterval))
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	for {
 		buffer := make([]byte, bufSize)
 		n, _, err := conn.ReadFrom(buffer)

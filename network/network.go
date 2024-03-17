@@ -481,7 +481,6 @@ func UDPBroadcastAlive(p string) {
 
 	for {
 		conn.WriteTo([]byte(key), addr)
-		fmt.Println("Broadcasting status!")
 		time.Sleep(100 * time.Millisecond)
 	}
 }

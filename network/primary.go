@@ -74,7 +74,7 @@ func UDPBroadCastPrimaryRole(p string, transmitEnable <-chan bool) {
 
 		select {
 		case enable = <-transmitEnable:
-		case <-time.After(udpInterval / 4):
+		case <-time.After(200 * time.Millisecond):
 		}
 		if enable {
 			conn.WriteTo([]byte(key), addr)
