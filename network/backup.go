@@ -17,7 +17,7 @@ type Backup struct {
 	lastSeen time.Time
 }
 
-func BackupRoutine(conn net.Conn, primaryAddress string,
+func BackupRoutine(conn net.Conn,
 	StateUpdateCh chan hall_request_assigner.ActiveElevator,
 	HallOrderCompleteCh chan elevio.ButtonEvent,
 	DisconnectedElevatorCh chan string,
@@ -32,7 +32,7 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 	//TODO: If backup unresponsive --> BecomePrimary(activeElevators). TODO: INIT A BACKUP IN BecomePrimary()
 	fmt.Println("Im a backup, doing backup things")
 	PrimaryDeadCh := make(chan bool)
-	go CheckPrimaryAlive(primaryAddress, PrimaryDeadCh)
+	go CheckPrimaryAlive(PrimaryDeadCh)
 
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
 	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
@@ -47,6 +47,8 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 			fmt.Println("BACKUP recieved stateUpdate: ", stateUpdate)
 			BackupActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
 			BackupCombinedHallRequests = UpdateCombinedHallRequests(BackupActiveElevatorMap, BackupCombinedHallRequests)
+			log.Println("== the backup Aktive Elevator map is: ", BackupActiveElevatorMap)
+			log.Println("== the backup combinedHallReq is:", BackupCombinedHallRequests)
 			TCPSendACK(conn)
 
 		case completedOrder := <-BackupHallOrderCompleteCh:
@@ -55,12 +57,14 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 			TCPSendACK(conn)
 
 		case disconnectedElevator := <-BackupDisconnectedElevatorCh:
-			fmt.Println("BACKUP recieved disconnectedElevator: ", disconnectedElevator)
+			fmt.Println("BACKUP recieved disconnectedElevator: ", strings.Split(disconnectedElevator, ":")[0])
 			delete(BackupActiveElevatorMap, disconnectedElevator)
+			log.Println("==after disconnecting elev the backup aktive elevator map is: ", BackupActiveElevatorMap)
 			TCPSendACK(conn)
 		case <-PrimaryDeadCh:
 			log.Println("Primary confirmed dead")
-			delete(BackupActiveElevatorMap, strings.Split(primaryAddress, ":")[0])
+			delete(BackupActiveElevatorMap, strings.Split(conn.RemoteAddr().String(), ":")[0])
+			log.Println("primary confirmed dead with addr: ", strings.Split(conn.RemoteAddr().String(), ":")[0])
 			time.Sleep(1 * time.Second)
 			BecomePrimary(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ReadHeartbeatsCh)
 
@@ -70,7 +74,7 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 
 // Read "I'm the Primary" -message from the Primary(). If no message is recieved after N seconds,
 // then BackupRoutine() can assume Primary is dead -> Promote itself to Primary.
-func CheckPrimaryAlive(primaryAddress string, PrimaryDeadCh chan bool) {
+func CheckPrimaryAlive(PrimaryDeadCh chan bool) {
 	//addr, err := net.ResolveUDPAddr("udp", primaryAddress)
 	//if err != nil {
 	//	log.Printf("-CheckPrimaryAlive() Error resolving UDP address: %v\n", err)
