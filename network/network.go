@@ -521,7 +521,7 @@ func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan str
 				fmt.Println("Recieved timestamp as ACK: ", t)
 				timestamp = connIP + "-" + time.Now().Format("15:04:05")
 			}
-
+			time.Sleep(850 * time.Millisecond)
 		case <-time.After(5 * time.Second):
 			fmt.Println("____-----_____-----_____---- Heartbeat not acknowledged in time.")
 			errCh <- errors.New("heartbeat timeout: connection might be broken")
@@ -545,7 +545,7 @@ func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan str
 				return
 			}
 			fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
-			time.Sleep(350 * time.Millisecond) // Try reducing this to minimal possible value.
+			time.Sleep(850 * time.Millisecond) // Try reducing this to minimal possible value.
 		}
 	}
 }
