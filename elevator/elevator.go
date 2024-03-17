@@ -42,5 +42,6 @@ func ElevatorInit() Elevator {
 			ClearRequestVariant: CV_InDirn,
 			DoorOpenDurationS:   3.0,
 		},
+		Available: true,
 	}
 }

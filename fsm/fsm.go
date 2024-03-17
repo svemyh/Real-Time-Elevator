@@ -167,7 +167,10 @@ func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 					EB_StuckCh <- false
 				}
 			}
+			default: 
+				EB_StuckCh <- false
 		}
+
 		if requests.HasRequests(elevatorState) {
 			log.Println("Elevator has no more requests. Not checking for stuck condition.")
 			return
