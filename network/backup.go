@@ -23,6 +23,7 @@ func BackupRoutine(conn net.Conn,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
 	AckCh chan bool) {
+
 	BackupActiveElevatorMap := make(map[string]elevator.Elevator)
 	var BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 
@@ -36,8 +37,9 @@ func BackupRoutine(conn net.Conn,
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
 	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
 	BackupDisconnectedElevatorCh := make(chan string)
+	ReadHeartbeatsCh := make(chan string, 1024)
 
-	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh)
+	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh, ReadHeartbeatsCh)
 
 	for {
 		select {
@@ -64,7 +66,7 @@ func BackupRoutine(conn net.Conn,
 			delete(BackupActiveElevatorMap, strings.Split(conn.RemoteAddr().String(), ":")[0])
 			log.Println("primary confirmed dead with addr: ", strings.Split(conn.RemoteAddr().String(), ":")[0])
 			time.Sleep(1 * time.Second)
-			BecomePrimary(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+			BecomePrimary(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ReadHeartbeatsCh)
 
 		}
 	}
@@ -111,7 +113,8 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 	HallOrderCompleteCh chan elevio.ButtonEvent,
 	DisconnectedElevatorCh chan string,
 	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	AckCh chan bool) {
+	AckCh chan bool,
+	ReadHeartbeatsCh chan string) {
 	//TODO: ALl below
 	//establish TCP connection with all elevators last primary had connections with as a client
 	//has to get a TCP conn object with all new elevators to be able to interact in PrimaryRoutine
@@ -137,9 +140,10 @@ func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
 		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
 		ConsumerChannels[conn] = personalAssignedHallRequestsCh
-		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
+		//go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh) // REPLACE TO: TCPWriteAssignedHallRequests()
+		go TCPWriteAssignedHallRequests(conn, personalAssignedHallRequestsCh, DisconnectedElevatorCh, ReadHeartbeatsCh)
 
-		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
+		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, ReadHeartbeatsCh)
 
 	}
 
