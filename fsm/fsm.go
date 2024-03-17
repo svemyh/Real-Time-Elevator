@@ -16,7 +16,6 @@ var (
 	elevatorState elevator.Elevator
  	isDoorOpen bool
 	doorOpenDurationS int64 = elevator.ElevatorInit().Config.DoorOpenDurationS
-	EB_StuckCh bool = false
 )
 
 func init() {
@@ -199,6 +198,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 			InitCabCopy						[elevio.N_Floors]bool, 
 ) {
 	var prev int = -1
+	var EB_StuckCh bool = false
 	log.Println("is in fsm")
 
 	if f := elevio.GetFloor(); f == -1 {
@@ -263,19 +263,22 @@ func FSMRun(device 							elevio.ElevInputDevice,
 			case elevator.EB_DoorOpen:
 				fmt.Println("Obstruction Detected", obstructionSignal)
 				for obstructionSignal && isDoorOpen {
-					doorIsOpen(true)
-					fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
-					EB_StuckCh = true
-					obstructionSignal := <-device.ObstructionCh
-					sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
-					if !obstructionSignal {
-						doorIsOpen(false)
-						fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
-						EB_StuckCh = false
-						time.Sleep(100 * time.Millisecond)
+						if obstructionSignal && isDoorOpen {
+						doorIsOpen(true)
+						fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
+						EB_StuckCh = true
+						obstructionSignal := <-device.ObstructionCh
 						sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
-						//break // Should be redundant
+						if !obstructionSignal {
+							doorIsOpen(false)
+							fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
+							EB_StuckCh = false
+							time.Sleep(100 * time.Millisecond)
+							sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+							//break // Should be redundant
+						}
 					}
+					time.Sleep(100 * time.Millisecond)
 				}
 				//doorIsOpen(false)
 				//fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
