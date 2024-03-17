@@ -11,8 +11,6 @@ import (
 
 func main() {
 	time.Sleep(5 * time.Second)
-	//just to enable running multiple elev server from same computer by doing go run main() port
-	//"15657" default port for elev server
 	var InitCabCopy [elevio.N_Floors]bool
 	if len(os.Args) == 2 {
 		InitCabCopy = elevio.StringToCabArray(os.Args[1])
@@ -23,7 +21,7 @@ func main() {
 	fmt.Println("The cab copy is: ", InitCabCopy)
 
 	Channels := network.NewElevatorSystemChannels()
-	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool) //no buffer in order to make sending blockig
+	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool) 
 
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int),
@@ -41,14 +39,12 @@ func main() {
 	// REFACTOR: Can be moved to InitNetwork()?
 
 	//run local elevator
-	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
+	go fsm.LocalElevatorFSM(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy) 
 
 	go network.RestartOnReconnect(CabCopyCh)
 
 	go network.UDPReadCombinedHallRequests(network.HALL_LIGHTS_PORT)
 	go network.UDPBroadcastAlive(network.LOCAL_ELEVATOR_ALIVE_PORT)
-
-	//establishConnectionWithPrimary() // TCP
 
 	select {}
 

@@ -13,7 +13,6 @@ import (
 
 var (
 	elevatorState     elevator.Elevator
-	isDoorOpen        bool
 	doorOpenDurationS int64 = elevator.ElevatorInit().Config.DoorOpenDurationS
 )
 
@@ -34,9 +33,9 @@ func handleInitBetweenFloors() {
 }
 
 func handleRequestButtonPress(btnFloor int,
-	btnType elevio.ButtonType,
-	FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
-	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+							  btnType elevio.ButtonType,
+							  FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
+							  CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) {
 
 	switch elevatorState.Behaviour {
@@ -73,9 +72,9 @@ func handleRequestButtonPress(btnFloor int,
 	setAllCabLights()
 }
 
-func handleFloorArrival(newFloor int,
-	FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
-	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+func handleFloorArrival(newFloor 				int,
+						FSMHallOrderCompleteCh 	chan<- elevio.ButtonEvent,
+						CabCopyCh 				chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) {
 	elevatorState.Floor = newFloor
 	elevio.SetFloorIndicator(elevatorState.Floor)
@@ -93,12 +92,10 @@ func handleFloorArrival(newFloor int,
 	default:
 		break
 	}
-	//fmt.Printf("\nNew state:\n")
-
 }
 
 func handleDoorTimeout(FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
-	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+					   CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) {
 
 	switch elevatorState.Behaviour {
@@ -123,12 +120,12 @@ func handleDoorTimeout(FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
 	}
 }
 
-func FsmRun(device 						elevio.ElevInputDevice,
-			FSMStateUpdateCh 			chan<- hall_request_assigner.ActiveElevator,
-			FSMHallOrderCompleteCh 		chan<- elevio.ButtonEvent,
-			FSMAssignedHallRequestsCh 	<-chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-			CabCopyCh 					chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
-			InitCabCopy 				[elevio.N_Floors]bool,
+func LocalElevatorFSM(device 						elevio.ElevInputDevice,
+					  FSMStateUpdateCh 				chan<- hall_request_assigner.ActiveElevator,
+					  FSMHallOrderCompleteCh 		chan<- elevio.ButtonEvent,
+					  FSMAssignedHallRequestsCh 	<-chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+					  CabCopyCh 					chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+					  InitCabCopy 					[elevio.N_Floors]bool,
 ) {
 	var prev int = -1
 
@@ -151,7 +148,7 @@ func FsmRun(device 						elevio.ElevInputDevice,
 	for {
 		select {
 		case floor := <-device.FloorSensorCh:
-			if floor != -1 && floor != prev { // Maybe this logic is redundant? TODO: Check it at later time.
+			if floor != -1 && floor != prev {
 				handleFloorArrival(floor, FSMHallOrderCompleteCh, CabCopyCh)
 
 				toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
