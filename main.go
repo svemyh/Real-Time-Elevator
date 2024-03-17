@@ -29,7 +29,7 @@ func main() {
 		FloorSensorCh:   make(chan int, 1024),
 		RequestButtonCh: make(chan elevio.ButtonEvent),
 		StopButtonCh:    make(chan bool),
-		ObstructionCh:   make(chan bool),
+		ObstructionCh:   make(chan bool, 1024),
 	}
 
 	go elevio.PollFloorSensor(device.FloorSensorCh)
