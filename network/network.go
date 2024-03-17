@@ -627,7 +627,11 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
 			fmt.Println("TCPReadElevatorStates() - Recieved TypeTimestamp: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
-			ReadHeartbeatsCh <- msg.Content
+			if strings.Split(msg.Content, "-")[0] == GetLocalIPv4() {
+				ReadHeartbeatsCh <- msg.Content
+				fmt.Println("_^_^_ Returning to primary: ", msg)
+			}
+
 		default:
 			fmt.Println("Unknown message type")
 		}
