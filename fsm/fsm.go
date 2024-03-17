@@ -262,12 +262,12 @@ func FSMRun(device 							elevio.ElevInputDevice,
 			switch elevatorState.Behaviour {
 			case elevator.EB_DoorOpen:
 				fmt.Println("Obstruction Detected", obstructionSignal)
-				for obstructionSignal && isDoorOpen {
+				for obstructionSignal && isDoorOpen {		//should perhaps be a Goroutine as this blocks
 						doorIsOpen(true)
 						fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
+						sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 						EB_StuckCh = true
 						obstructionSignal := <-device.ObstructionCh
-						sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 						if !obstructionSignal {
 							doorIsOpen(false)
 							fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)

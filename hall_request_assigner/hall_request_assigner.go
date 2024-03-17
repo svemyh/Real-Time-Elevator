@@ -122,8 +122,8 @@ func HallRequestAssigner(ActiveElevatorsMap map[string]elevator.Elevator, Combin
 		panic("OS not supported")
 	}
 
-	//filteredActiveElevatorsMap := ActiveElevatorsMap
-
+	filteredActiveElevatorsMap := ActiveElevatorsMap
+/*
 	filteredActiveElevatorsMap := make(map[string]elevator.Elevator)
 	for ip, elev := range ActiveElevatorsMap {
 		if elev.Available { // Check if the elevator is marked as available
@@ -132,7 +132,7 @@ func HallRequestAssigner(ActiveElevatorsMap map[string]elevator.Elevator, Combin
 			log.Println("ActiveElevatorsmap", ActiveElevatorsMap) 
 		}
 	}
-
+*/
 	input := ActiveElevators_to_HRAInput(filteredActiveElevatorsMap, CombinedHallRequests)
 
 	jsonBytes, err := json.Marshal(input)
