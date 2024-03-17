@@ -11,9 +11,6 @@ import (
 	"strings"
 )
 
-// Struct members must be public in order to be accessible by json.Marshal/.Unmarshal
-// This means they must start with a capital letter, so we need to use field renaming struct tags to make them camelCase
-
 type HRAElevState struct {
 	Behavior    string `json:"behaviour"`
 	Floor       int    `json:"floor"`
@@ -31,12 +28,7 @@ type ActiveElevator struct {
 	MyAddress string
 }
 
-// Consider an array called "ActiveElevators" of objects (or pointers to objects) of type elevio.Elevator, where each elevio.Elevator corresponds to an "active/alive" elevator, that can take requests.
-// Make a function HallRequestAssigner that takes in "ActiveElevators" and spits out a similar array of elevio.Elevator objects with newly assigned requests. This array will be fed to the fsm of the individual elevators.
-
 func ActiveElevators_to_HRAInput(ActiveElevatorsMap map[string]elevator.Elevator, CombinedHallRequests [elevio.N_Floors][2]bool) HRAInput {
-
-	// ActiveElevatorMap := make(map[string]elevator.Elevator)
 
 	StateMap := make(map[string]HRAElevState)
 	for key, elevator := range ActiveElevatorsMap {
@@ -126,21 +118,18 @@ func HallRequestAssigner(ActiveElevatorsMap map[string]elevator.Elevator, Combin
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
 		fmt.Println("json.Marshal error: ", err)
-		//return "Error parsing input to json"
 	}
 
 	ret, err := exec.Command("hall_request_assigner/"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
 	if err != nil {
 		fmt.Println("exec.Command error: ", err)
 		fmt.Println(string(ret))
-		//return "Error executing hall_request_assigner"
 	}
 
 	output := new(map[string][elevio.N_Floors][2]bool)
 	err = json.Unmarshal(ret, &output)
 	if err != nil {
 		fmt.Println("json.Unmarshal error: ", err)
-		//return "Error parsing output from json"
 	}
 
 	return *output

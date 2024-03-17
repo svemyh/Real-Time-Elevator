@@ -22,6 +22,8 @@ func BackupRoutine(conn 					net.Conn,
 	BackupActiveElevatorMap := make(map[string]elevator.Elevator)
 	var BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 
+	fmt.Println("I am now a Backup")
+
 	PrimaryDeadCh := make(chan bool)
 	go CheckPrimaryAlive(PrimaryDeadCh)
 
@@ -34,27 +36,20 @@ func BackupRoutine(conn 					net.Conn,
 	for {
 		select {
 		case stateUpdate := <-BackupStateUpdateCh:
-			fmt.Println("BACKUP recieved stateUpdate: ", stateUpdate)
 			BackupActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
 			BackupCombinedHallRequests = UpdateCombinedHallRequests(BackupActiveElevatorMap, BackupCombinedHallRequests)
-			log.Println("== the backup Aktive Elevator map is: ", BackupActiveElevatorMap)
-			log.Println("== the backup combinedHallReq is:", BackupCombinedHallRequests)
 			TCPSendACK(conn)
 
 		case completedOrder := <-BackupHallOrderCompleteCh:
-			fmt.Println("BACKUP recieved completedOrder: ", completedOrder)
 			BackupCombinedHallRequests[completedOrder.Floor][completedOrder.Button] = false
 			TCPSendACK(conn)
 
 		case disconnectedElevator := <-BackupDisconnectedElevatorCh:
-			fmt.Println("BACKUP recieved disconnectedElevator: ", strings.Split(disconnectedElevator, ":")[0])
 			delete(BackupActiveElevatorMap, disconnectedElevator)
-			log.Println("==after disconnecting elev the backup aktive elevator map is: ", BackupActiveElevatorMap)
 			TCPSendACK(conn)
 		case <-PrimaryDeadCh:
-			log.Println("Primary confirmed dead")
 			delete(BackupActiveElevatorMap, strings.Split(conn.RemoteAddr().String(), ":")[0])
-			log.Println("primary confirmed dead with addr: ", strings.Split(conn.RemoteAddr().String(), ":")[0])
+			fmt.Println("Primary confirmed dead with the address: ", strings.Split(conn.RemoteAddr().String(), ":")[0])
 			time.Sleep(1 * time.Second)
 			BecomePrimary(BackupActiveElevatorMap, BackupCombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 
@@ -62,8 +57,6 @@ func BackupRoutine(conn 					net.Conn,
 	}
 }
 
-// Read "I'm the Primary" -message from the Primary(). If no message is recieved after N seconds,
-// then BackupRoutine() can assume Primary is dead -> Promote itself to Primary.
 func CheckPrimaryAlive(PrimaryDeadCh chan bool) {
 
 	conn := conn.DialBroadcastUDP(StringPortToInt(DETECTION_PORT))
@@ -84,34 +77,25 @@ func CheckPrimaryAlive(PrimaryDeadCh chan bool) {
 
 		message := string(buffer[:n])
 		if message == "I'm the Primary" {
-			log.Printf("Received %s from primary, remaining as backup...", message)
-			conn.SetReadDeadline(time.Now().Add(udpInterval)) // Reset readDeadline
+			fmt.Printf("Received %s from primary, remaining as backup...", message)
+			conn.SetReadDeadline(time.Now().Add(udpInterval))
 		}
-		// If received message is not "I'm the Primary", keep listening until timeout
-		// At timeout become a primary
 	}
 }
 
-func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
-	BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	StateUpdateCh chan hall_request_assigner.ActiveElevator,
-	HallOrderCompleteCh chan elevio.ButtonEvent,
-	DisconnectedElevatorCh chan string,
-	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-	AckCh chan bool) {
-	//TODO: ALl below
-	//establish TCP connection with all elevators last primary had connections with as a client
-	//has to get a TCP conn object with all new elevators to be able to interact in PrimaryRoutine
-	//Needs to run a goroutine TCPReadElevatorStates when connection established
-	//Note, the elevator list will contain your own IP. DO NOT CONNECT TO IT, as PrimaryRoutine will make this connection
-	//(OR HANDLE HERE IF DESIRED)
+func BecomePrimary(BackupActiveElevatorMap 		map[string]elevator.Elevator,
+				   BackupCombinedHallRequests 	[elevio.N_Floors][elevio.N_Buttons - 1]bool,
+				   StateUpdateCh 				chan hall_request_assigner.ActiveElevator,
+				   HallOrderCompleteCh 			chan elevio.ButtonEvent,
+				   DisconnectedElevatorCh 		chan string,
+				   AssignHallRequestsCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+				   AckCh 						chan bool,
+) {
 
 	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
 	ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
 	ConnChan := make(chan net.Conn, 1024)
-	//go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
 
-	//TCPDialAsPrimary
 	fmt.Println("BackupActiveElevatorMap: ", BackupActiveElevatorMap)
 	for ip, _ := range BackupActiveElevatorMap {
 		fmt.Println("Connecting by TCP to the address: ", ip+TCP_NEW_PRIMARY_LISTEN_PORT)

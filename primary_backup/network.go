@@ -89,14 +89,14 @@ func NewElevatorSystemChannels() ElevatorSystemChannels {
 	}
 }
 
-func InitNetwork(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator,
-				 FSMHallOrderCompleteCh 	chan elevio.ButtonEvent,
-				 StateUpdateCh 				chan hall_request_assigner.ActiveElevator,
-				 HallOrderCompleteCh 		chan elevio.ButtonEvent,
-				 DisconnectedElevatorCh 	chan string,
-				 FSMAssignedHallRequestsCh 	chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-				 AssignHallRequestsCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-				 AckCh 						chan bool,
+func InitPrimaryBackup(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator,
+					   FSMHallOrderCompleteCh 		chan elevio.ButtonEvent,
+					   StateUpdateCh 				chan hall_request_assigner.ActiveElevator,
+					   HallOrderCompleteCh 			chan elevio.ButtonEvent,
+					   DisconnectedElevatorCh 		chan string,
+					   FSMAssignedHallRequestsCh 	chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+					   AssignHallRequestsCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+					   AckCh 						chan bool,
 ) {
 	isPrimary, primaryAddress := AmIPrimary(DETECTION_PORT)
 	if isPrimary {
@@ -109,7 +109,6 @@ func InitNetwork(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator,
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 	} else {
-		log.Println("Operating as client...")
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		go TCPListenForNewPrimary(TCP_NEW_PRIMARY_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		conn, err := TCPListenForBackupPromotion(TCP_BACKUP_PORT)
@@ -120,7 +119,7 @@ func InitNetwork(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator,
 	}
 }
 
-// Checks the event that a backup has become a new primary and wants to establish connection. This go routine should be shut down at some point
+// Checks the event that a backup has become a new primary and wants to establish connection
 func TCPListenForNewPrimary(port string, 
 							FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator, 
 							FSMHallOrderCompleteCh 		chan elevio.ButtonEvent, 

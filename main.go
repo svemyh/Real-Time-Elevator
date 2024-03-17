@@ -10,6 +10,8 @@ import (
 )
 
 func main() {
+	fmt.Printf("Started!\n")
+
 	time.Sleep(5 * time.Second)
 	var InitCabCopy [elevio.N_Floors]bool
 	if len(os.Args) == 2 {
@@ -17,8 +19,6 @@ func main() {
 	}
 	elevio.Init("localhost:15657", elevio.N_Floors)
 
-	fmt.Printf("Started!\n")
-	fmt.Println("The cab copy is: ", InitCabCopy)
 
 	Channels := primary_backup.NewElevatorSystemChannels()
 	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool)
@@ -35,10 +35,8 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	go primary_backup.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
-	// REFACTOR: Can be moved to InitNetwork()?
+	go primary_backup.InitPrimaryBackup(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
 
-	//run local elevator
 	go fsm.LocalElevatorFSM(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy)
 
 	go primary_backup.RestartOnReconnect(CabCopyCh)
