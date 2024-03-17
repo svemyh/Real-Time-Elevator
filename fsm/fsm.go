@@ -186,7 +186,6 @@ func LocalElevatorFSM(device 						elevio.ElevInputDevice,
 			}
 			for i := 0; i < elevio.N_Floors; i++ {
 				for j := 0; j < 2; j++ {
-					//elevatorState.Requests[i][j] = false
 					if AssignedHallRequests[i][j] {
 						handleRequestButtonPress(i, elevio.ButtonType(j), FSMHallOrderCompleteCh, CabCopyCh)
 						time.Sleep(5 * time.Millisecond)
