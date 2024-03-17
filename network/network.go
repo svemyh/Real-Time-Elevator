@@ -474,6 +474,7 @@ func SendHeartbeatsV0(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan s
 					errCh <- err
 					return
 				}
+				fmt.Println("data: ", TimestampMsg)
 				_, err = conn.Write(data)
 				if err != nil {
 					fmt.Printf("Failed to send heartbeat: %v\n", err)
@@ -555,18 +556,18 @@ func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan str
 				Type:    TypeTimestamp,
 				Content: timestamp,
 			}
-			data, err := json.Marshal(TimestampMsg)
-			if err != nil {
-				fmt.Printf("Failed to encode MsgString to json: %v\n", err)
-				errCh <- err
-				return
-			}
-			_, err = conn.Write(data)
-			if err != nil {
-				fmt.Printf("Failed to send heartbeat: %v\n", err)
-				errCh <- err
-				return
-			}
+			// data, err := json.Marshal(TimestampMsg)
+			// if err != nil {
+			// 	fmt.Printf("Failed to encode MsgString to json: %v\n", err)
+			// 	errCh <- err
+			// 	return
+			// }
+			// _, err = conn.Write(data)
+			// if err != nil {
+			// 	fmt.Printf("Failed to send heartbeat: %v\n", err)
+			// 	errCh <- err
+			// 	return
+			// }
 			fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
 			time.Sleep(950 * time.Millisecond) // Try reducing this to minimal possible value.
 		}
