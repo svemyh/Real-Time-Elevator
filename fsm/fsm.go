@@ -158,6 +158,7 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 	stuckDuration := time.Duration(elevatorState.Config.DoorOpenDurationS+3) * time.Second
 
 	stuckTimer := time.NewTimer(stuckDuration)
+	stuckTimer.Stop()
 	
 	for {
 		select {
@@ -165,7 +166,7 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 			if elevatorState.Behaviour == elevator.EB_Moving && lastFloor != -1 {
 				log.Printf("Elevator is stuck at floor: %d\n", lastFloor)
 				EB_StuckCh = true
-				sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+				//sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 				stuckTimer.Reset(stuckDuration)
 			}
 
@@ -177,17 +178,16 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 					stuckTimer.Reset(stuckDuration)
 					log.Printf("Elevator moved to floor: %d\n", currentFloor)
 					EB_StuckCh = false
-					sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+					//sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 				}
 			}
 		}
 
 		if requests.HasRequests(elevatorState) {
 			log.Println("Elevator has no more requests. Not checking for stuck condition.")
-			stuckTimer.Stop()
 			return
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -267,13 +267,13 @@ func FSMRun(device 							elevio.ElevInputDevice,
 					fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
 					EB_StuckCh = true
 					obstructionSignal := <-device.ObstructionCh
-					sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+					//sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 					if !obstructionSignal {
 						doorIsOpen(false)
 						fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
 						EB_StuckCh = false
-						time.Sleep(500 * time.Millisecond)
-						sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+						time.Sleep(100 * time.Millisecond)
+					//	sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 						//break // Should be redundant
 					}
 				}
@@ -282,7 +282,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 				
 				//sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 
 		case AssignedHallRequests := <-FSMAssignedHallRequestsCh:

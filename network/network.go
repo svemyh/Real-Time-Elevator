@@ -102,7 +102,6 @@ func InitNetwork(FSMStateUpdateCh 			chan hall_request_assigner.ActiveElevator,
 				FSMAssignedHallRequestsCh 	chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 
 				AssignHallRequestsCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 
 				AckCh 						chan bool,
-				EB_StuckCh					<-chan bool,
 	) {
 	clientUpdateCh := make(chan ClientUpdate)
 	//clientTxEnable := make(chan bool)

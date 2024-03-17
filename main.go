@@ -24,7 +24,6 @@ func main() {
 
 	Channels := network.NewElevatorSystemChannels()
 	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool) //no buffer in order to make sending blockig
-	EB_StuckCh := make(chan bool, 1024)
 
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int, 1024),
