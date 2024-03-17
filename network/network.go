@@ -502,7 +502,7 @@ func SendHeartbeatsV0(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan s
 }
 
 // Continously monitors that a net.Conn is still alive
-func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) {
+func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) { //TODO: ReadHeartbeatsCh also needs a broadcaster/consumer - or maybe a high enough heartbeat rate will fix it actually
 	timestampCh := make(chan string, 1024)
 	connIP := conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
