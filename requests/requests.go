@@ -125,3 +125,64 @@ func ClearAtCurrentFloor(e 						elevator.Elevator,
 	CabCopyCh <- e.Requests
 	return e
 }
+
+/*
+
+func ClearAtCurrentFloor(e elevator.Elevator, 
+	FSMHallOrderCompleteCh chan<- elevio.ButtonEvent, 
+	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool) elevator.Elevator {
+// Clear all requests at the current floor based on the elevator's configuration.
+switch e.Config.ClearRequestVariant {
+	case elevator.CV_All:
+	for button := 0; button < elevio.N_Buttons; button++ {
+		e.Requests[e.Floor][button] = false
+	}
+	notifyClearedRequests(e.Floor, FSMHallOrderCompleteCh)
+
+	case elevator.CV_InDirn:
+		e.Requests[e.Floor][elevio.BT_Cab] = false
+
+		clearDirectionalRequests(e, FSMHallOrderCompleteCh)
+	}
+		CabCopyCh <- e.Requests
+		return e
+	}
+
+func notifyClearedRequests(floor int, ch chan<- elevio.ButtonEvent) {
+	ch <- elevio.ButtonEvent{Floor: floor, Button: elevio.ButtonType(elevio.B_HallUp)}
+	ch <- elevio.ButtonEvent{Floor: floor, Button: elevio.ButtonType(elevio.B_HallDown)}
+}
+
+func clearDirectionalRequests(e elevator.Elevator, ch chan<- elevio.ButtonEvent) {
+switch e.Dirn {
+	case elevio.D_Up:
+		clearIfNoRequestsAbove(e, ch, elevio.B_HallDown)
+		e.Requests[e.Floor][elevio.B_HallUp] = false
+		ch <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallUp)}
+
+	case elevio.D_Down:
+		clearIfNoRequestsBelow(e, ch, elevio.B_HallUp)
+		e.Requests[e.Floor][elevio.B_HallDown] = false
+		ch <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(elevio.B_HallDown)}
+
+	case elevio.D_Stop:
+		e.Requests[e.Floor][elevio.B_HallUp] = false
+		e.Requests[e.Floor][elevio.B_HallDown] = false
+		notifyClearedRequests(e.Floor, ch)
+		}
+}
+
+func clearIfNoRequestsAbove(e elevator.Elevator, ch chan<- elevio.ButtonEvent, btnType elevio.Button) {
+	if !requestsAbove(e) && !e.Requests[e.Floor][btnType] {
+	e.Requests[e.Floor][btnType] = false
+	ch <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(btnType)}
+	}
+}
+
+func clearIfNoRequestsBelow(e elevator.Elevator, ch chan<- elevio.ButtonEvent, btnType elevio.Button) {
+	if !requestsBelow(e) && !e.Requests[e.Floor][btnType] {
+	e.Requests[e.Floor][btnType] = false
+	ch <- elevio.ButtonEvent{Floor: e.Floor, Button: elevio.ButtonType(btnType)}
+	}
+}
+*/
