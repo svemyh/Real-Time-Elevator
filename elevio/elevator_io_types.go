@@ -21,6 +21,15 @@ const (
 	B_Cab      Button = 2
 )
 
+type ButtonType int
+
+const (
+	BT_HallUp   ButtonType = 0
+	BT_HallDown ButtonType = 1
+	BT_Cab      ButtonType = 2
+)
+
+
 type ButtonEvent struct {
 	Floor  int
 	Button ButtonType
@@ -31,18 +40,4 @@ type ElevInputDevice struct {
 	RequestButtonCh chan ButtonEvent
 	StopButtonCh    chan bool
 	ObstructionCh   chan bool
-}
-
-type IndividualButton struct {
-	Button ButtonType
-	floor  int
-	value  bool
-}
-
-type ElevOutputDevice struct {
-	FloorIndicator     int
-	RequestButtonLight IndividualButton
-	DoorLight          bool
-	StopButtonLight    bool
-	MotorDirection     Dirn
 }

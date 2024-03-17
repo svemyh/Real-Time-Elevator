@@ -16,19 +16,6 @@ var _numFloors int = 4
 var _mtx sync.Mutex
 var _conn net.Conn
 
-type ButtonType int
-
-const (
-	BT_HallUp   ButtonType = 0
-	BT_HallDown ButtonType = 1
-	BT_Cab      ButtonType = 2
-)
-
-// type ButtonEvent struct {
-// 	Floor  int
-// 	Button ButtonType
-// }
-
 func Init(addr string, numFloors int) {
 	if _initialized {
 		fmt.Println("Driver already initialized!")
