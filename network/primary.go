@@ -236,10 +236,10 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		case stateUpdate := <-StateUpdateCh:
 			fmt.Println("StateUpdate: ", stateUpdate)
 			filteredActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
-			if len(filteredActiveElevatorMap) >= 2 {
-				if _, exists := filteredActiveElevatorMap[BackupAddr]; !exists {
+			if len(ActiveElevatorMap) >= 2 {
+				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
 					fmt.Println("Backup does not exists yet. Initializing it..")
-					BackupAddr = GetBackupAddress(filteredActiveElevatorMap)
+					BackupAddr = GetBackupAddress(ActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
 				}
