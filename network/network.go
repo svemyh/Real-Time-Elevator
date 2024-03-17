@@ -299,7 +299,7 @@ func TCPReadAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
 				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
-			fmt.Println("TCPReadAssignedHallRequests() - Recieved TypeTimestamp: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
+			//fmt.Println("TCPReadAssignedHallRequests() - Recieved TypeTimestamp: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
 			TimestampMsg := MsgString{
 				Type:    TypeTimestamp,
 				Content: msg.Content,
@@ -312,7 +312,7 @@ func TCPReadAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 			if err != nil {
 				fmt.Printf("Failed to return heartbeat: %v\n", err)
 			}
-			fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
+			//fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
 			time.Sleep(350 * time.Millisecond) // Try reducing this to minimal possible value.
 		default:
 			fmt.Println("TCPReadAssignedHallRequests() - Unknown message type")
@@ -503,6 +503,8 @@ func SendHeartbeatsV0(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan s
 
 // Continously monitors that a net.Conn is still alive
 func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) { //TODO: ReadHeartbeatsCh also needs a broadcaster/consumer - or maybe a high enough heartbeat rate will fix it actually
+	time.Sleep(15 * time.Second)
+
 	timestampCh := make(chan string, 1024)
 	connIP := conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
@@ -514,18 +516,36 @@ func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan str
 	fmt.Println("____-----___--- 1)", conn.LocalAddr().(*net.TCPAddr).IP.String()+"-"+time.Now().Format("15:04:05"))
 	fmt.Println("____-----___--- 2)", conn.LocalAddr().String()+"-"+time.Now().Format("15:04:05"))
 	fmt.Println("____-----___--- 3)", conn.RemoteAddr().String()+"-"+time.Now().Format("15:04:05"))
+
+	TimestampCh := make(chan time.Time)
+	go func(TimestampCh chan time.Time) {
+		ticker := time.NewTicker(300 * time.Millisecond)
+		TTimestamp := time.Now()
+		for {
+			select {
+			case <-ticker.C:
+				if time.Since(TTimestamp) > 5*time.Second {
+					fmt.Println("____-----_____-----_____---- _____----_____----_____----____-----_____-----_____---- _____----_____----_____----____-----_____-----_____---- _____----_____----_____----")
+					fmt.Println("Heartbeat not acknowledged in time. Consider conn as dead")
+					errCh <- errors.New("heartbeat timeout: connection might be broken")
+					return
+				}
+				fmt.Println("*Time since <-ReadHeartbeatsCh:", time.Since(TTimestamp))
+			case T := <-TimestampCh:
+				TTimestamp = T
+			}
+		}
+	}(TimestampCh)
+
 	for {
 		select {
-		case t := <-ReadHeartbeatsCh: // Messages that primary recieve
+		case t := <-ReadHeartbeatsCh: // Messages recieved from individual elevators
 			if t == timestamp {
-				fmt.Println("Recieved timestamp as ACK: ", t)
+				fmt.Println("Recieved timestamp t := <-ReadHeartbeatsCh: ", t)
+				TimestampCh <- time.Now()
 				timestamp = connIP + "-" + time.Now().Format("15:04:05")
 			}
-			time.Sleep(850 * time.Millisecond)
-		case <-time.After(5 * time.Second):
-			fmt.Println("____-----_____-----_____---- Heartbeat not acknowledged in time.")
-			errCh <- errors.New("heartbeat timeout: connection might be broken")
-			return
+			time.Sleep(80 * time.Millisecond)
 
 		default: // Sending heartbeat to individual elevators
 			TimestampMsg := MsgString{
@@ -545,7 +565,7 @@ func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan str
 				return
 			}
 			fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
-			time.Sleep(850 * time.Millisecond) // Try reducing this to minimal possible value.
+			time.Sleep(950 * time.Millisecond) // Try reducing this to minimal possible value.
 		}
 	}
 }
@@ -626,15 +646,16 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
 				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
-			fmt.Println("TCPReadElevatorStates() - Recieved TypeTimestamp: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
-			if strings.Split(msg.Content, "-")[0] == GetLocalIPv4() {
-				ReadHeartbeatsCh <- msg.Content
-				fmt.Println("_^_^_ Returning to primary: ", msg)
-			}
+			//fmt.Println("TCPReadElevatorStates() - Recieved TypeTimestamp: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
+			//if strings.Split(msg.Content, "-")[0] == GetLocalIPv4() {
+			//	ReadHeartbeatsCh <- msg.Content
+			//}
+			ReadHeartbeatsCh <- msg.Content
 
 		default:
 			fmt.Println("Unknown message type")
 		}
+		time.Sleep(50 * time.Second)
 	}
 }
 
