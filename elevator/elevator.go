@@ -21,7 +21,7 @@ const (
 
 type Config struct {
 	ClearRequestVariant ClearRequestVariant
-	DoorOpenDurationS   float64
+	DoorOpenDurationS   int64
 }
 
 type Elevator struct { // add local ip mby?
