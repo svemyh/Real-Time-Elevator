@@ -37,7 +37,7 @@ func BackupRoutine(conn net.Conn, primaryAddress string,
 	BackupStateUpdateCh := make(chan hall_request_assigner.ActiveElevator)
 	BackupHallOrderCompleteCh := make(chan elevio.ButtonEvent)
 	BackupDisconnectedElevatorCh := make(chan string)
-	ReadHeartbeatsCh := make(chan string)
+	ReadHeartbeatsCh := make(chan string, 1024)
 
 	go TCPReadElevatorStates(conn, BackupStateUpdateCh, BackupHallOrderCompleteCh, BackupDisconnectedElevatorCh, ReadHeartbeatsCh)
 
