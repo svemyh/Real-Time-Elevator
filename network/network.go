@@ -458,7 +458,7 @@ func UDPCheckPeerAliveStatus(port string, DisconnectedElevatorCh chan string, Cl
 				//send IP on disconnected elevators channel
 				print("detected a disconnected elevator with IP: ", IP)
 				delete(checkAliveStatus, IP)
-				CloseConnCh <- peerIP
+				CloseConnCh <- IP
 			}
 		}
 

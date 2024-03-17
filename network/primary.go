@@ -167,9 +167,12 @@ func handleConn(connChan chan net.Conn, DisconnectedElevatorCh chan string, Clos
 	for {
 		select {
 		case c := <-connChan:
+			fmt.Println("RemoteAddr: ", strings.Split((c).RemoteAddr().String(), ":")[0])
+			fmt.Println("LocalAddr: ", strings.Split((c).LocalAddr().String(), ":")[0])
 			ActiveConns[strings.Split((c).RemoteAddr().String(), ":")[0]] = c
 
 		case c := <-CloseConnCh:
+			fmt.Println("c := <-CloseConnCh: ", c)
 			for ip, conn := range ActiveConns {
 				if ip == c {
 					conn.Close()
