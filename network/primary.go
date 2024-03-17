@@ -211,6 +211,8 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			MyAddress: GetMapKey(ActiveElevatorMap),
 		}
 	}
+	filteredActiveElevatorMap := make(map[string]elevator.Elevator)
+
 	for {
 		// Guarantees that ActiveElevatorMap contains Primary
 		if _, exists := ActiveElevatorMap[GetLocalIPv4()]; !exists && len(ActiveElevatorMap) > 0 { // TODO: add case for if len=0
@@ -221,7 +223,6 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			}
 		}
 		
-		filteredActiveElevatorMap := make(map[string]elevator.Elevator)
 		log.Println("HALL REQUEST ASSIGNER ActiveElevatorsMap:", ActiveElevatorMap)
 		for ip, elev := range ActiveElevatorMap {
 			if elev.Available { // Check if the elevator is marked as available
