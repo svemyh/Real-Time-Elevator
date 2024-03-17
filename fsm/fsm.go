@@ -157,6 +157,7 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 	stuckDuration := time.Duration(elevatorState.Config.DoorOpenDurationS+3) * time.Second
 
 	stuckTimer := time.NewTimer(stuckDuration)
+	stuckTimer.Stop()
 	
 	for {
 		select {
@@ -165,6 +166,7 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 				log.Printf("Elevator is stuck at floor: %d\n", lastFloor)
 				EB_StuckCh = true
 				sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
+				stuckTimer.Stop()
 				stuckTimer.Reset(stuckDuration)
 			}
 
@@ -180,7 +182,6 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 				}
 			}
 		}
-		stuckTimer.Stop()
 
 		if requests.HasRequests(elevatorState) {
 			log.Println("Elevator has no more requests. Not checking for stuck condition.")
@@ -263,7 +264,6 @@ func FSMRun(device 							elevio.ElevInputDevice,
 			case elevator.EB_DoorOpen:
 				fmt.Println("Obstruction Detected", obstructionSignal)
 				for obstructionSignal && isDoorOpen {
-						if obstructionSignal && isDoorOpen {
 						doorIsOpen(true)
 						fmt.Println("Obstruction Detected - DoorLight On", isDoorOpen)
 						EB_StuckCh = true
@@ -277,7 +277,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 							sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
 							//break // Should be redundant
 						}
-					}
+					
 					time.Sleep(100 * time.Millisecond)
 				}
 				//doorIsOpen(false)
