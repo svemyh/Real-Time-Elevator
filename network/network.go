@@ -116,7 +116,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		//init empty activeElevMap and CombinedHallReq
 		var CombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
 		ActiveElevatorMap := make(map[string]elevator.Elevator)
-		ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool)
+		ConsumerChannels := make(map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
 		go PrimaryRoutine(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, ConsumerChannels)
 		time.Sleep(1500 * time.Millisecond)
 		TCPDialPrimary(GetLocalIPv4()+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
@@ -137,7 +137,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		if err != nil {
 			panic(err)
 		}
-		BackupRoutine(conn, primaryAddress+DETECTION_PORT, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
+		BackupRoutine(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh)
 	}
 }
 
@@ -261,7 +261,10 @@ func sendLocalStatesToPrimaryLoop(conn net.Conn, FSMStateUpdateCh chan hall_requ
 				}
 				time.Sleep(50 * time.Millisecond)
 			*/
-			TCPSendActiveElevator(conn, stateUpdate)
+			err := TCPSendActiveElevator(conn, stateUpdate)
+			if err != nil {
+				return
+			}
 
 		case hallOrderComplete := <-FSMHallOrderCompleteCh:
 			my_ButtonEventMsg := MsgButtonEvent{
