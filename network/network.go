@@ -1,10 +1,10 @@
 package network
 
 import (
+	"elevator/conn"
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
-	"elevator/conn"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -21,6 +21,7 @@ var TCP_LISTEN_PORT string = ":14279"
 var HALL_LIGHTS_PORT string = ":14274"
 var TCP_BACKUP_PORT string = ":14275"
 var TCP_NEW_PRIMARY_LISTEN_PORT string = ":14276"
+var LOCAL_ELEVATOR_ALIVE_PORT string = ":17878"
 
 type MessageType string
 
@@ -423,7 +424,7 @@ func StartClient(port string, msg Message) {
 	}
 }
 
-func UDPCheckPeerAliveStatus(port string, peerNetworkLossCh chan string) {
+func UDPCheckPeerAliveStatus(port string) {
 	conn := conn.DialBroadcastUDP(StringPortToInt(port))
 	checkAliveStatus := make(map[string]int)
 
@@ -456,11 +457,30 @@ func UDPCheckPeerAliveStatus(port string, peerNetworkLossCh chan string) {
 				//send IP on disconnected elevators channel
 				print("detected a disconnected elevator with IP: ", IP)
 				delete(checkAliveStatus, peerIP)
-				peerNetworkLossCh <- peerIP
+				//peerNetworkLossCh <- peerIP
 			}
 		}
 
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(800 * time.Millisecond)
+	}
+}
+
+func UDPBroadcastAlive(p string) {
+
+	port := StringPortToInt(p)
+	key := GetLocalIPv4()
+
+	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
+
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		conn.WriteTo([]byte(key), addr)
+		fmt.Println("Broadcasting status!")
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
