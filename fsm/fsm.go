@@ -154,8 +154,7 @@ func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 			if elevatorState.Behaviour == elevator.EB_Moving && lastFloor != -1 {
 				log.Printf("Elevator is stuck at floor: %d\n", lastFloor)
 				EB_StuckCh <- true
-				//stuckTimer.Reset(stuckDuration)
-				time.Sleep(500 * time.Millisecond)
+				stuckTimer.Reset(stuckDuration)
 			}
 
 		case currentFloor := <-elevio.NewElevInputDevice().FloorSensorCh:
