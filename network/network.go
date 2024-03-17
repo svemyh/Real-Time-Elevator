@@ -384,6 +384,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		default:
 			fmt.Println("Unknown message type")
 		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
