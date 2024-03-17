@@ -456,12 +456,12 @@ func UDPCheckPeerAliveStatus(port string) {
 			if count > 10 {
 				//send IP on disconnected elevators channel
 				print("detected a disconnected elevator with IP: ", IP)
-				delete(checkAliveStatus, peerIP)
+				delete(checkAliveStatus, IP)
 				//peerNetworkLossCh <- peerIP
 			}
 		}
 
-		time.Sleep(800 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -480,7 +480,7 @@ func UDPBroadcastAlive(p string) {
 	for {
 		conn.WriteTo([]byte(key), addr)
 		fmt.Println("Broadcasting status!")
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
