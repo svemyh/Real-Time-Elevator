@@ -33,9 +33,9 @@ func handleInitBetweenFloors() {
 }
 
 func handleRequestButtonPress(btnFloor int,
-							  btnType elevio.ButtonType,
-							  FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
-							  CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+	btnType elevio.ButtonType,
+	FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
+	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) {
 
 	switch elevatorState.Behaviour {
@@ -72,9 +72,9 @@ func handleRequestButtonPress(btnFloor int,
 	setAllCabLights()
 }
 
-func handleFloorArrival(newFloor 				int,
-						FSMHallOrderCompleteCh 	chan<- elevio.ButtonEvent,
-						CabCopyCh 				chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+func handleFloorArrival(newFloor int,
+	FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
+	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) {
 	elevatorState.Floor = newFloor
 	elevio.SetFloorIndicator(elevatorState.Floor)
@@ -95,7 +95,7 @@ func handleFloorArrival(newFloor 				int,
 }
 
 func handleDoorTimeout(FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
-					   CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) {
 
 	switch elevatorState.Behaviour {
@@ -120,18 +120,18 @@ func handleDoorTimeout(FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
 	}
 }
 
-func LocalElevatorFSM(device 						elevio.ElevInputDevice,
-					  FSMStateUpdateCh 				chan<- hall_request_assigner.ActiveElevator,
-					  FSMHallOrderCompleteCh 		chan<- elevio.ButtonEvent,
-					  FSMAssignedHallRequestsCh 	<-chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
-					  CabCopyCh 					chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
-					  InitCabCopy 					[elevio.N_Floors]bool,
+func LocalElevatorFSM(device elevio.ElevInputDevice,
+	FSMStateUpdateCh chan<- hall_request_assigner.ActiveElevator,
+	FSMHallOrderCompleteCh chan<- elevio.ButtonEvent,
+	FSMAssignedHallRequestsCh <-chan [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	CabCopyCh chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
+	InitCabCopy [elevio.N_Floors]bool,
 ) {
 	var prev int = -1
 
 	if f := elevio.GetFloor(); f == -1 {
 		handleInitBetweenFloors()
-	} else { // Send current elevator to master
+	} else {
 		FSMStateUpdateCh <- hall_request_assigner.ActiveElevator{
 			Elevator:  elevatorState,
 			MyAddress: primary_backup.GetLocalIPv4(),
@@ -194,7 +194,6 @@ func LocalElevatorFSM(device 						elevio.ElevInputDevice,
 			}
 
 		default:
-			// No action - prevents blocking on channel reads
 			time.Sleep(200 * time.Millisecond)
 		}
 		if timer.TimerTimedOut() {
