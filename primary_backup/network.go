@@ -332,7 +332,6 @@ func TCPDialBackup(address string, port string) net.Conn {
 	return conn
 }
 
-
 func UDPCheckPeerAliveStatus(port string, DisconnectedElevatorCh chan string, CloseConnCh chan string) {
 	conn := conn.DialBroadcastUDP(StringPortToInt(port))
 	checkAliveStatus := make(map[string]int)
@@ -342,7 +341,7 @@ func UDPCheckPeerAliveStatus(port string, DisconnectedElevatorCh chan string, Cl
 		var buf [bufSize]byte
 		n, _, err := conn.ReadFrom(buf[:])
 		if err != nil {
-			fmt.Println("Error reading from UPDCheckAliveStatus: ", err)
+			fmt.Println("Error reading from connection: ", err)
 			continue
 		}
 		peerIP := string(buf[:n])
@@ -350,8 +349,6 @@ func UDPCheckPeerAliveStatus(port string, DisconnectedElevatorCh chan string, Cl
 		if _, exists := checkAliveStatus[peerIP]; !exists {
 			checkAliveStatus[peerIP] = 0
 		}
-
-		log.Print("alive map: ", checkAliveStatus)
 
 		for IP, _ := range checkAliveStatus {
 			if IP != peerIP {
@@ -363,13 +360,11 @@ func UDPCheckPeerAliveStatus(port string, DisconnectedElevatorCh chan string, Cl
 
 		for IP, count := range checkAliveStatus {
 			if count > 30 {
-				//send IP on disconnected elevators channel
 				print("detected a disconnected elevator with IP: ", IP)
 				delete(checkAliveStatus, IP)
 				CloseConnCh <- IP
 			}
 		}
-
 		time.Sleep(50 * time.Millisecond)
 	}
 }
@@ -379,7 +374,7 @@ func UDPBroadcastAlive(p string) {
 	port := StringPortToInt(p)
 	key := GetLocalIPv4()
 
-	conn := conn.DialBroadcastUDP(port) // FIX SO THAT ITS COMPATIBLE WITH STRING
+	conn := conn.DialBroadcastUDP(port)
 
 	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
 	if err != nil {
@@ -412,7 +407,6 @@ func RestartOnReconnect(CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) 
 				CabCopy[floor] = requestCopy[floor][elevio.BT_Cab]
 			}
 
-			fmt.Println("copy cab is: ", elevio.CabArrayToString(CabCopy))
 		default:
 			if ConnectedToNetwork() && !prevWasConnected {
 				cabString := elevio.CabArrayToString(CabCopy)
@@ -425,15 +419,13 @@ func RestartOnReconnect(CabCopyCh chan [elevio.N_Floors][elevio.N_Buttons]bool) 
 				if err != nil {
 					fmt.Println("Failed to execute command:", err)
 				}
-				fmt.Println("copy cab is: ", elevio.CabArrayToString(CabCopy))
-				panic("No network connection. Terminating current run - restarting from restart.go")
+				panic("No network connection. Terminating current run - restarting from main.go")
 			}
 			if ConnectedToNetwork() {
 				prevWasConnected = true
 			} else {
 				prevWasConnected = false
 			}
-			// Sleep(1 second) was here, should it remain? - 14.03 22:04 - Sveinung og Mikael
 		}
 		time.Sleep(1 * time.Millisecond)
 	}
