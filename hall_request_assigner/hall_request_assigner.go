@@ -5,7 +5,6 @@ import (
 	"elevator/elevio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os/exec"
 	"runtime"
@@ -122,17 +121,7 @@ func HallRequestAssigner(ActiveElevatorsMap map[string]elevator.Elevator, Combin
 		panic("OS not supported")
 	}
 
-	filteredActiveElevatorsMap := make(map[string]elevator.Elevator)
-	log.Println("HALL REQUEST ASSIGNER ActiveElevatorsMap:", ActiveElevatorsMap)
-	for ip, elev := range ActiveElevatorsMap {
-		if elev.Available { // Check if the elevator is marked as available
-			filteredActiveElevatorsMap[ip] = elev
-		}
-	}
-	log.Println("HALL REQUEST ASSIGNER filteredActiveElevatorsMap:", filteredActiveElevatorsMap)
-
-
-	input := ActiveElevators_to_HRAInput(filteredActiveElevatorsMap, CombinedHallRequests)
+	input := ActiveElevators_to_HRAInput(ActiveElevatorsMap, CombinedHallRequests)
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {

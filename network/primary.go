@@ -220,18 +220,25 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				MyAddress: GetLocalIPv4(),
 			}
 		}
+		
+		filteredActiveElevatorMap := make(map[string]elevator.Elevator)
+		log.Println("HALL REQUEST ASSIGNER ActiveElevatorsMap:", ActiveElevatorMap)
+		for ip, elev := range ActiveElevatorMap {
+			if elev.Available { // Check if the elevator is marked as available
+				filteredActiveElevatorMap[ip] = elev
+			}
+		}
 
-		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", ActiveElevatorMap)
+		fmt.Println("~~ HandlePrimaryTasks() - ActiveElevatorMap: ", filteredActiveElevatorMap)
 		fmt.Println("~~ HandlePrimaryTasks() - CombinedHallRequests: ", CombinedHallRequests)
 		select {
 		case stateUpdate := <-StateUpdateCh:
 			fmt.Println("StateUpdate: ", stateUpdate)
-			ActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
-
+			filteredActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
 			if len(ActiveElevatorMap) >= 2 {
-				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
+				if _, exists := filteredActiveElevatorMap[BackupAddr]; !exists {
 					fmt.Println("Backup does not exists yet. Initializing it..")
-					BackupAddr = GetBackupAddress(ActiveElevatorMap)
+					BackupAddr = GetBackupAddress(filteredActiveElevatorMap)
 					backupConn = TCPDialBackup(BackupAddr, TCP_BACKUP_PORT)
 					go TCPReadACK(backupConn, DisconnectedElevatorCh, AckCh) // Using the established backupConn start listening for ACK's from Backup.
 				}
@@ -240,11 +247,11 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 					select {
 					case <-AckCh:
 						fmt.Println("ACK received: In case stateUpdate")
-						CombinedHallRequests = UpdateCombinedHallRequests(ActiveElevatorMap, CombinedHallRequests)
+						CombinedHallRequests = UpdateCombinedHallRequests(filteredActiveElevatorMap, CombinedHallRequests)
 						BroadcastCombinedHallRequestsCh <- CombinedHallRequests
-						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests)
+						AssignHallRequestsCh <- hall_request_assigner.HallRequestAssigner(filteredActiveElevatorMap, CombinedHallRequests)
 						fmt.Println("BroadcastCombinedHallRequestsCh <- : ", CombinedHallRequests)
-						fmt.Println("AssignHallRequestsCh <- : ", hall_request_assigner.HallRequestAssigner(ActiveElevatorMap, CombinedHallRequests))
+						fmt.Println("AssignHallRequestsCh <- : ", hall_request_assigner.HallRequestAssigner(filteredActiveElevatorMap, CombinedHallRequests))
 					case <-time.After(5 * time.Second):
 						fmt.Println("No ACK recieved - Timeout occurred. In case stateUpdate")
 						// Handle the timeout event, e.g., retransmit the message or take appropriate action -> i.e. Consider the backup to be dead
