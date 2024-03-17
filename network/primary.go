@@ -151,9 +151,11 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
 		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
 		ConsumerChannels[conn] = personalAssignedHallRequestsCh
-		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
+		ReadHeartbeatsCh := make(chan string, 1024)
+		//go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh) // REPLACE TO: TCPWriteAssignedHallRequests()
+		go TCPWriteAssignedHallRequests(conn, personalAssignedHallRequestsCh, DisconnectedElevatorCh, ReadHeartbeatsCh)
 
-		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
+		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, ReadHeartbeatsCh)
 		time.Sleep(100 * time.Millisecond)
 	}
 }
@@ -389,6 +391,28 @@ func TCPSendACK(conn net.Conn) {
 	_, err = conn.Write(data)
 	if err != nil {
 		fmt.Println("Error sending ACK: ", err)
+		return
+	}
+	time.Sleep(50 * time.Millisecond)
+}
+
+// UNUSED?
+func TCPSendPing(conn net.Conn) {
+	myPingMsg := MsgPing{
+		Type:    TypePing,
+		Content: "PING",
+	}
+
+	fmt.Println("TCPSendPing():", myPingMsg)
+	data, err := json.Marshal(myPingMsg)
+	if err != nil {
+		fmt.Println("Error encoding PING to json: ", err)
+		return
+	}
+
+	_, err = conn.Write(data)
+	if err != nil {
+		fmt.Println("Error sending PING: ", err)
 		return
 	}
 	time.Sleep(50 * time.Millisecond)
