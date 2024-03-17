@@ -235,7 +235,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 		select {
 		case stateUpdate := <-StateUpdateCh:
 			fmt.Println("StateUpdate: ", stateUpdate)
-			filteredActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
+			ActiveElevatorMap[stateUpdate.MyAddress] = stateUpdate.Elevator
 			if len(ActiveElevatorMap) >= 2 {
 				if _, exists := ActiveElevatorMap[BackupAddr]; !exists {
 					fmt.Println("Backup does not exists yet. Initializing it..")
