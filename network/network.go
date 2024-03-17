@@ -15,11 +15,11 @@ import (
 	"time"
 )
 
-var DETECTION_PORT string = ":13213"
-var TCP_LISTEN_PORT string = ":13219"
-var HALL_LIGHTS_PORT string = ":15474"
-var TCP_BACKUP_PORT string = ":14524"
-var TCP_NEW_PRIMARY_LISTEN_PORT = ":12214"
+var DETECTION_PORT string = ":13214"
+var TCP_LISTEN_PORT string = ":13229"
+var HALL_LIGHTS_PORT string = ":15574"
+var TCP_BACKUP_PORT string = ":14514"
+var TCP_NEW_PRIMARY_LISTEN_PORT = ":13214"
 
 type MessageType string
 
