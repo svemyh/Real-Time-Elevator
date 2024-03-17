@@ -262,7 +262,7 @@ func TCPWriteElevatorStates(conn net.Conn, personalAssignedHallRequestsCh chan m
 	}
 }
 
-// Recieves message on AssignedHallRequestsCh and distributes said message to all consumer go-routines ConsumerAssignedHallRequestsCh
+// Recieves message on AssignedHallRequestsCh and distributes said message to all consumer go-routines in ConsumerAssignedHallRequestsCh
 func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, Consumers map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
 	for hallRequests := range AssignedHallRequestsCh {
 		for _, ch := range Consumers {
@@ -271,45 +271,30 @@ func StartBroadcaster(AssignedHallRequestsCh chan map[string][elevio.N_Floors][e
 	}
 }
 
-// Alias: Server()
 func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string) {
-	//TODO:Read the states and store in a buffer
-	//TODO: Check if the read data was due to local elevator reaching a floor and clearing a request (send cleared request on OrderCompleteCh)
-	//TODO:send the updated states on stateUpdateCh so that it can be read in HandlePrimaryTasks(StateUpdateCh)
-	// Can be added/expanded: LocalErrorDetectedCh or similar
-	// type StateUpdateCh = IP + elevatorStates
-	// type HallOrderCopleteCh = floor number (of cab call completed)
-
 	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s\n", conn.LocalAddr())
 	fmt.Printf("TCPReadElevatorStates() - *New connection accepted from address: %s to %s\n", conn.LocalAddr(), conn.RemoteAddr().String())
 
 	defer conn.Close()
-
 	for {
-		// Create buffer and read data into the buffer using conn.Read()
 		var buf [bufSize]byte
 		n, err := conn.Read(buf[:])
 		if err != nil {
-			// Error means TCP-conn has broken -> Need to feed this signal to drop the conn's respective ActiveElevator from Primary's ActiveElevators. It is now considered inactive.
-			DisconnectedElevatorCh <- conn.RemoteAddr().String() // Question: Should this be LocalAddr() or RemoteAddr() or both?
+			DisconnectedElevatorCh <- conn.RemoteAddr().String()
 			break
-			//conn.Close()
-			//panic(err)
 		}
 
-		// Decoding said data into a json-style object
 		var genericMsg map[string]interface{}
 		if err := json.Unmarshal(buf[:n], &genericMsg); err != nil {
 			fmt.Println("Error unmarshaling generic message: ", err)
-			fmt.Println("Panic was here 1)")
 			continue
 		}
-		// Based on MessageType (which is an element of each struct sent over connection) determine how its corresponding data should be decoded.
+
 		switch MessageType(genericMsg["type"].(string)) {
 		case TypeActiveElevator:
 			var msg MsgActiveElevator
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				fmt.Println("Error unmarshaling data: ", err)
 			}
 			fmt.Printf("Received ActiveElevator object: %+v\n", msg)
 			StateUpdateCh <- msg.Content
@@ -317,16 +302,15 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 		case TypeButtonEvent:
 			var msg MsgButtonEvent
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				fmt.Println("Error unmarshaling data: ", err)
 			}
 			fmt.Printf("Received ButtonEvent object: %+v\n", msg)
 			HallOrderCompleteCh <- msg.Content
 		case TypeString:
 			var msg MsgString
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+				fmt.Println("Error unmarshaling data: ", err)
 			}
-			fmt.Printf("Received string object: %+v\n", msg)
 			DisconnectedElevatorCh <- msg.Content
 
 		default:
@@ -336,36 +320,18 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 }
 
 func TCPDialBackup(address string, port string) net.Conn {
-	fmt.Println("TCPDialBackup() - Connecting by TCP to the address: ", address+port)
+	fmt.Println("Connecting by TCP to the address: ", address+port)
 
 	conn, err := net.Dial("tcp", address+port)
 	if err != nil {
-		fmt.Println("Error in TCPDialBackup() - Connection failed. Error: ", err)
+		fmt.Println("Connection failed. Error: ", err)
 		return nil
 	}
 
-	fmt.Println("TCPDialBackup() - Conection established to: ", conn.RemoteAddr())
+	fmt.Println("Conection established to: ", conn.RemoteAddr())
 	return conn
 }
 
-// Can be used for testing purposes for writing either a ActiveElevator or ButtonEvent to TCPReadElevatorStates
-func StartClient(port string, msg Message) {
-	conn, err := net.Dial("tcp", "localhost"+port)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	data, err := json.Marshal(msg)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = conn.Write(data)
-	if err != nil {
-		panic(err)
-	}
-}
 
 func UDPCheckPeerAliveStatus(port string, DisconnectedElevatorCh chan string, CloseConnCh chan string) {
 	conn := conn.DialBroadcastUDP(StringPortToInt(port))
