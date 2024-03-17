@@ -158,7 +158,6 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 	stuckDuration := time.Duration(elevatorState.Config.DoorOpenDurationS+3) * time.Second
 
 	stuckTimer := time.NewTimer(stuckDuration)
-	stuckTimer.Stop()
 	
 	for {
 		select {
@@ -182,6 +181,7 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 				}
 			}
 		}
+		stuckTimer.Stop()
 
 		if requests.HasRequests(elevatorState) {
 			log.Println("Elevator has no more requests. Not checking for stuck condition.")
