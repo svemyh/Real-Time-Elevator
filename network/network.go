@@ -134,7 +134,7 @@ func InitNetwork(FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSM
 		log.Println("Operating as client...")
 		go TCPDialPrimary(primaryAddress+TCP_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
 		go TCPListenForNewPrimary(GetLocalIPv4() + TCP_NEW_PRIMARY_LISTEN_PORT, FSMStateUpdateCh, FSMHallOrderCompleteCh, FSMAssignedHallRequestsCh)
-		conn, err := TCPListenForBackupPromotion(GetLocalIPv4() + TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
+		conn, err := TCPListenForBackupPromotion(TCP_BACKUP_PORT) //will simply be a net.Listen("TCP", "primaryAdder"). This blocks code until a connection is established
 		if err != nil {
 			panic(err)
 		}
@@ -172,7 +172,7 @@ func TCPListenForNewPrimary(TCPPort string, FSMStateUpdateCh chan hall_request_a
 func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 	fmt.Println(" - Executing TCPListenForBackupPromotion()")
 
-	ls, err := kcp.Listen(port)
+	ls, err := net.Listen("tcp", port)
 	if err != nil {
 		fmt.Println("TCPListenForBackupPromotion - The connection failed. Error:", err)
 		return nil, err
@@ -391,7 +391,7 @@ func TCPReadElevatorStates(conn net.Conn, StateUpdateCh chan hall_request_assign
 func TCPDialBackup(address string, port string) net.Conn {
 	fmt.Println("TCPDialBackup() - Connecting by TCP to the address: ", address+port)
 
-	conn, err := kcp.Dial(address+port)
+	conn, err := net.Dial("tcp", address+port)
 	if err != nil {
 		fmt.Println("Error in TCPDialBackup() - Connection failed. Error: ", err)
 		return nil
