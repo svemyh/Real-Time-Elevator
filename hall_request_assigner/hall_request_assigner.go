@@ -101,7 +101,7 @@ func InitActiveElevator() ActiveElevator {
 			Dirn:      elevio.D_Stop,
 			Behaviour: elevator.EB_Idle,
 			Config: elevator.Config{
-				ClearRequestVariant: elevator.CV_InDoorn,
+				ClearRequestVariant: elevator.CV_InDirn,
 				DoorOpenDurationS:   3.0,
 			},
 		},
