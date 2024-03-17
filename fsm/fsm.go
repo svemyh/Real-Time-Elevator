@@ -154,7 +154,8 @@ func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 			if elevatorState.Behaviour == elevator.EB_Moving && lastFloor != -1 {
 				log.Printf("Elevator is stuck at floor: %d\n", lastFloor)
 				EB_StuckCh <- true
-				stuckTimer.Reset(stuckDuration)
+				//stuckTimer.Reset(stuckDuration)
+				time.Sleep(500 * time.Millisecond)
 			}
 
 		case currentFloor := <-elevio.NewElevInputDevice().FloorSensorCh:
@@ -167,8 +168,6 @@ func checkStuckBetweenFloors(EB_StuckCh chan<- bool) {
 					EB_StuckCh <- false
 				}
 			}
-			default: 
-				EB_StuckCh <- false
 		}
 
 		if requests.HasRequests(elevatorState) {
@@ -261,7 +260,7 @@ func FSMRun(device 							elevio.ElevInputDevice,
 						fmt.Println("Obstruction Cleared - DoorLight Off", isDoorOpen)
 						EB_StuckCh <- false
 						time.Sleep(500 * time.Millisecond)
-						break
+						//break // Should be redundant
 					}
 				}
 				doorIsOpen(false)

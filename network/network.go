@@ -205,15 +205,15 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 
 func updateStuckElevators(ActiveElevatorMap map[string]elevator.Elevator, EB_StuckCh <-chan bool) {
 	for {
-		select {
-		case isStuck := <-EB_StuckCh:
-			elevator, ok := ActiveElevatorMap[GetMapKey(ActiveElevatorMap)]
-			if ok {
-				// Update the Available field based on EB_StuckCh value
-				elevator.Available = isStuck
-				ActiveElevatorMap[GetMapKey(ActiveElevatorMap)] = elevator
-			}
+		isStuck := <-EB_StuckCh
+		elevator, ok := ActiveElevatorMap[GetMapKey(ActiveElevatorMap)]
+		if ok {
+			log.Println("Updated stuck elevator")
+			elevator.Available = isStuck
+			ActiveElevatorMap[GetMapKey(ActiveElevatorMap)] = elevator
 		}
+		
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
