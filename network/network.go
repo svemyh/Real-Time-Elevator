@@ -206,14 +206,11 @@ func TCPListenForBackupPromotion(port string) (net.Conn, error) {
 func updateStuckElevators(ActiveElevatorMap map[string]elevator.Elevator, EB_StuckCh <-chan bool) {
 	for {
 		isStuck := <-EB_StuckCh
-		elevator, ok := ActiveElevatorMap[GetMapKey(ActiveElevatorMap)]
-		if ok {
-			log.Println("Updated stuck elevator")
-			elevator.Available = isStuck
-			ActiveElevatorMap[GetMapKey(ActiveElevatorMap)] = elevator
-		}
-		
-		time.Sleep(100 * time.Millisecond)
+		elevator := ActiveElevatorMap[GetMapKey(ActiveElevatorMap)]
+		log.Println("Updated stuck elevator")
+		elevator.Available = isStuck
+		ActiveElevatorMap[GetMapKey(ActiveElevatorMap)] = elevator
+		time.Sleep(300 * time.Millisecond)
 	}
 }
 
