@@ -211,7 +211,6 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 			MyAddress: GetMapKey(ActiveElevatorMap),
 		}
 	}
-	filteredActiveElevatorMap := make(map[string]elevator.Elevator)
 
 	for {
 		// Guarantees that ActiveElevatorMap contains Primary
@@ -222,6 +221,7 @@ func HandlePrimaryTasks(ActiveElevatorMap map[string]elevator.Elevator,
 				MyAddress: GetLocalIPv4(),
 			}
 		}
+		filteredActiveElevatorMap := make(map[string]elevator.Elevator)
 		
 		log.Println("HALL REQUEST ASSIGNER ActiveElevatorsMap:", ActiveElevatorMap)
 		for ip, elev := range ActiveElevatorMap {
