@@ -440,6 +440,7 @@ func SendHeartbeats(conn net.Conn, errCh chan<- error) {
 			errCh <- err
 			return
 		}
+		fmt.Println(" -- SendHeartbeats sent ", ping, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
 		time.Sleep(1 * time.Second) // Try reducing this to minimal possible value.
 	}
 }
