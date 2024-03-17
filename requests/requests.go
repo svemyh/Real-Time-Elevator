@@ -84,7 +84,7 @@ func ShouldClearImmediately(e elevator.Elevator, btnFloor int, btnType elevio.Bu
 	}
 }
 
-func ClearAtCurrentFloor(e 						elevator.Elevator, 
+func ClearAtCurrentFloorAndSendUpdate(e 						elevator.Elevator, 
 						 FSMHallOrderCompleteCh chan<- elevio.ButtonEvent, 
 						 CabCopyCh 				chan<- [elevio.N_Floors][elevio.N_Buttons]bool,
 ) elevator.Elevator { 

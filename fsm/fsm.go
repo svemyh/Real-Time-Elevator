@@ -50,7 +50,7 @@ func handleRequestButtonPress(btnFloor 					int,
 			doorIsOpen(true)
 			log.Println("handleRequestButtonPress1 - DoorOpen")
 			timer.DoorTimerStart(doorOpenDurationS)
-			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
+			elevatorState = requests.ClearAtCurrentFloorAndSendUpdate(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 			if btnType != elevio.B_Cab { // FSMHallOrderCompleteCh only accepts
 				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: btnFloor, Button: elevio.ButtonType(btnType)}
 			}
@@ -70,7 +70,7 @@ func handleRequestButtonPress(btnFloor 					int,
 		case elevator.EB_DoorOpen:
 			doorIsOpen(true)
 			timer.DoorTimerStart(doorOpenDurationS)
-			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
+			elevatorState = requests.ClearAtCurrentFloorAndSendUpdate(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 			if btnType != elevio.B_Cab { // FSMHallOrderCompleteCh only accepts
 				FSMHallOrderCompleteCh <- elevio.ButtonEvent{Floor: btnFloor, Button: elevio.ButtonType(btnType)}
 			}
@@ -99,7 +99,7 @@ func handleFloorArrival(newFloor 				int,
 			fmt.Println("Should stop")
 			elevio.SetMotorDirection(elevio.D_Stop)
 			doorIsOpen(true)
-			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
+			elevatorState = requests.ClearAtCurrentFloorAndSendUpdate(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 			timer.DoorTimerStart(doorOpenDurationS)
 			setAllCabLights()
 			elevatorState.Behaviour = elevator.EB_DoorOpen
@@ -121,7 +121,7 @@ func handleDoorTimeout(FSMHallOrderCompleteCh 	chan<- elevio.ButtonEvent,
 		case elevator.EB_DoorOpen:
 			doorIsOpen(true)
 			timer.DoorTimerStart(doorOpenDurationS)
-			elevatorState = requests.ClearAtCurrentFloor(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
+			elevatorState = requests.ClearAtCurrentFloorAndSendUpdate(elevatorState, FSMHallOrderCompleteCh, CabCopyCh)
 			setAllCabLights()
 			log.Println("handleDoorTimeout - DoorOpen")
 			
