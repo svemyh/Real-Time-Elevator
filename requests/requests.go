@@ -38,9 +38,9 @@ func requestsHere(e elevator.Elevator) bool {
 
 func HasRequests(e elevator.Elevator) bool {
 	if requestsAbove(e) || requestsBelow(e) || requestsHere(e) {
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func ChooseDirection(e elevator.Elevator) (elevio.Dirn, elevator.ElevatorBehaviour) { // Elevator doesn't have a motorDirection, but it does have a Dirn

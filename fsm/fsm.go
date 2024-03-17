@@ -166,7 +166,6 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 				log.Printf("Elevator is stuck at floor: %d\n", lastFloor)
 				EB_StuckCh = true
 				sendStuckElevatorState(EB_StuckCh, FSMStateUpdateCh)
-				stuckTimer.Stop()
 				stuckTimer.Reset(stuckDuration)
 			}
 
@@ -183,7 +182,7 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 			}
 		}
 
-		if requests.HasRequests(elevatorState) {
+		if !requests.HasRequests(elevatorState) {
 			log.Println("Elevator has no more requests. Not checking for stuck condition.")
 			return
 		}
