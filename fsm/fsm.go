@@ -142,7 +142,7 @@ func handleDoorTimeout(FSMHallOrderCompleteCh 	chan<- elevio.ButtonEvent,
 
 func sendStuckElevatorState(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_request_assigner.ActiveElevator) {
 	log.Println("Updated stuck elevator")
-	elevatorState.Available = EB_StuckCh
+	elevatorState.Available = !EB_StuckCh
 	toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
 		Elevator:  elevatorState,
 		MyAddress: network.GetLocalIPv4(),
@@ -159,7 +159,6 @@ func checkStuckBetweenFloors(EB_StuckCh bool, FSMStateUpdateCh chan<- hall_reque
 
 	stuckTimer := time.NewTimer(stuckDuration)
 	
-
 	for {
 		select {
 		case <-stuckTimer.C:
