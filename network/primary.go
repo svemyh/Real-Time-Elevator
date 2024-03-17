@@ -130,7 +130,7 @@ func AmIPrimary(addressString string, peerUpdateCh chan<- ClientUpdate) (bool, s
 	}
 }
 
-func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool) {
+func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate, StateUpdateCh chan hall_request_assigner.ActiveElevator, HallOrderCompleteCh chan elevio.ButtonEvent, DisconnectedElevatorCh chan string, AssignedHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, ConsumerChannels map[net.Conn]chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, CloseConnCh chan string) {
 	ls, err := net.Listen("tcp", TCPPort)
 	if err != nil {
 		fmt.Println("The connection failed. Error:", err)
@@ -141,7 +141,10 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 
 	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()
 	go StartBroadcaster(AssignedHallRequestsCh, ConsumerChannels)
+	connChan := make(chan net.Conn, 1024)
+	go handleConn(connChan, DisconnectedElevatorCh, CloseConnCh)
 
+	// go handleConn(ConnCloseConsumerChannels)
 	for {
 		conn, err := ls.Accept()
 		if err != nil {
@@ -150,11 +153,31 @@ func TCPListenForNewElevators(TCPPort string, clientUpdateCh chan<- ClientUpdate
 		}
 		fmt.Println("Conection established to: ", conn.RemoteAddr())
 		personalAssignedHallRequestsCh := make(chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
-		ConsumerChannels[conn] = personalAssignedHallRequestsCh
+		connChan <- conn
 		go TCPWriteElevatorStates(conn, personalAssignedHallRequestsCh)
-
 		go TCPReadElevatorStates(conn, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh)
+
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func handleConn(connChan chan net.Conn, DisconnectedElevatorCh chan string, CloseConnCh chan string) {
+
+	ActiveConns := make(map[string]net.Conn)
+	for {
+		select {
+		case c := <-connChan:
+			ActiveConns[strings.Split((c).RemoteAddr().String(), ":")[0]] = c
+
+		case c := <-CloseConnCh:
+			for ip, conn := range ActiveConns {
+				if ip == c {
+					conn.Close()
+					delete(ActiveConns, ip)
+					DisconnectedElevatorCh <- ip
+				}
+			}
+		}
 	}
 }
 
@@ -171,11 +194,12 @@ func PrimaryRoutine(ActiveElevatorMap map[string]elevator.Elevator,
 	clientUpdateCh := make(chan ClientUpdate)
 	helloRx := make(chan ElevatorSystemChannels)
 	BroadcastCombinedHallRequestsCh := make(chan [elevio.N_Floors][elevio.N_Buttons - 1]bool, 1024)
+	CloseConnCh := make(chan string, 1024)
 
-	go UDPCheckPeerAliveStatus(LOCAL_ELEVATOR_ALIVE_PORT)
+	go UDPCheckPeerAliveStatus(LOCAL_ELEVATOR_ALIVE_PORT, DisconnectedElevatorCh, CloseConnCh)
 	go UDPBroadCastPrimaryRole(DETECTION_PORT, clientTxEnable)
-	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                                     //Continously broadcast that you are a primary on UDP
-	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, ConsumerChannels) //Continously listen if new elevator entring networks is trying to establish connection
+	go UDPBroadCastCombinedHallRequests(HALL_LIGHTS_PORT, CombinedHallRequests, BroadcastCombinedHallRequestsCh)                                                                  //Continously broadcast that you are a primary on UDP
+	go TCPListenForNewElevators(TCP_LISTEN_PORT, clientUpdateCh, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, ConsumerChannels, CloseConnCh) //Continously listen if new elevator entring networks is trying to establish connection
 	go HandlePrimaryTasks(ActiveElevatorMap, CombinedHallRequests, StateUpdateCh, HallOrderCompleteCh, DisconnectedElevatorCh, AssignHallRequestsCh, AckCh, BroadcastCombinedHallRequestsCh)
 
 	for {

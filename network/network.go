@@ -424,7 +424,7 @@ func StartClient(port string, msg Message) {
 	}
 }
 
-func UDPCheckPeerAliveStatus(port string) {
+func UDPCheckPeerAliveStatus(port string, DisconnectedElevatorCh chan string, CloseConnCh chan string) {
 	conn := conn.DialBroadcastUDP(StringPortToInt(port))
 	checkAliveStatus := make(map[string]int)
 
@@ -453,11 +453,11 @@ func UDPCheckPeerAliveStatus(port string) {
 		}
 
 		for IP, count := range checkAliveStatus {
-			if count > 10 {
+			if count > 30 {
 				//send IP on disconnected elevators channel
 				print("detected a disconnected elevator with IP: ", IP)
 				delete(checkAliveStatus, IP)
-				//peerNetworkLossCh <- peerIP
+				CloseConnCh <- peerIP
 			}
 		}
 
