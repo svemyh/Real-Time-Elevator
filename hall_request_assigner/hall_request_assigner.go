@@ -5,6 +5,7 @@ import (
 	"elevator/elevio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os/exec"
 	"runtime"
@@ -101,7 +102,7 @@ func InitActiveElevator() ActiveElevator {
 			Dirn:      elevio.D_Stop,
 			Behaviour: elevator.EB_Idle,
 			Config: elevator.Config{
-				ClearRequestVariant: elevator.CV_InDoorn,
+				ClearRequestVariant: elevator.CV_InDirn,
 				DoorOpenDurationS:   3.0,
 			},
 		},
@@ -121,7 +122,18 @@ func HallRequestAssigner(ActiveElevatorsMap map[string]elevator.Elevator, Combin
 		panic("OS not supported")
 	}
 
-	input := ActiveElevators_to_HRAInput(ActiveElevatorsMap, CombinedHallRequests)
+	//filteredActiveElevatorsMap := ActiveElevatorsMap
+
+	filteredActiveElevatorsMap := make(map[string]elevator.Elevator)
+	for ip, elev := range ActiveElevatorsMap {
+		if elev.Available { // Check if the elevator is marked as available
+			filteredActiveElevatorsMap[ip] = elev
+			log.Println("FilteredActiveElevatorsMap", filteredActiveElevatorsMap)
+			log.Println("ActiveElevatorsmap", ActiveElevatorsMap) 
+		}
+	}
+
+	input := ActiveElevators_to_HRAInput(filteredActiveElevatorsMap, CombinedHallRequests)
 
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {

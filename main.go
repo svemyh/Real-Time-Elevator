@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	time.Sleep(5 * time.Second)
+	time.Sleep(4 * time.Second)
 	//just to enable running multiple elev server from same computer by doing go run main() port
 	//"15657" default port for elev server
 	var InitCabCopy [elevio.N_Floors]bool
@@ -26,10 +26,10 @@ func main() {
 	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool) //no buffer in order to make sending blockig
 
 	device := elevio.ElevInputDevice{
-		FloorSensorCh:   make(chan int),
+		FloorSensorCh:   make(chan int, 1024),
 		RequestButtonCh: make(chan elevio.ButtonEvent),
 		StopButtonCh:    make(chan bool),
-		ObstructionCh:   make(chan bool),
+		ObstructionCh:   make(chan bool, 1024),
 	}
 
 	go elevio.PollFloorSensor(device.FloorSensorCh)
@@ -41,7 +41,7 @@ func main() {
 	// REFACTOR: Can be moved to InitNetwork()?
 
 	//run local elevator
-	go fsm.FsmRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
+	go fsm.FSMRun(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy) // should also pass in the folowing as arguments at some point: (FSMStateUpdateCh chan hall_request_assigner.ActiveElevator, FSMHallOrderCompleteCh chan elevio.ButtonEvent)
 
 	go network.RestartOnReconnect(CabCopyCh)
 
