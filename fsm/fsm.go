@@ -4,7 +4,7 @@ import (
 	"elevator/elevator"
 	"elevator/elevio"
 	"elevator/hall_request_assigner"
-	"elevator/network"
+	"elevator/primary_backup"
 	"elevator/requests"
 	"elevator/timer"
 	"fmt"
@@ -134,7 +134,7 @@ func LocalElevatorFSM(device 						elevio.ElevInputDevice,
 	} else { // Send current elevator to master
 		FSMStateUpdateCh <- hall_request_assigner.ActiveElevator{
 			Elevator:  elevatorState,
-			MyAddress: network.GetLocalIPv4(),
+			MyAddress: primary_backup.GetLocalIPv4(),
 		}
 	}
 
@@ -153,7 +153,7 @@ func LocalElevatorFSM(device 						elevio.ElevInputDevice,
 
 				toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
 					Elevator:  elevatorState,
-					MyAddress: network.GetLocalIPv4(),
+					MyAddress: primary_backup.GetLocalIPv4(),
 				}
 				FSMStateUpdateCh <- toBeSentActiveElevatorState
 			}
@@ -162,7 +162,7 @@ func LocalElevatorFSM(device 						elevio.ElevInputDevice,
 		case buttonEvent := <-device.RequestButtonCh:
 			toBeSentActiveElevatorState := hall_request_assigner.ActiveElevator{
 				Elevator:  elevatorState,
-				MyAddress: network.GetLocalIPv4(),
+				MyAddress: primary_backup.GetLocalIPv4(),
 			}
 			toBeSentActiveElevatorState.Elevator.Requests[buttonEvent.Floor][buttonEvent.Button] = true
 			if elevatorState.Floor != -1 { // Guarantees that FsmOnInitBetweenFloors() is completed before any button-presses are sent.

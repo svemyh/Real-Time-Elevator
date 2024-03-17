@@ -3,7 +3,7 @@ package main
 import (
 	"elevator/elevio"
 	"elevator/fsm"
-	"elevator/network"
+	"elevator/primary_backup"
 	"fmt"
 	"os"
 	"time"
@@ -20,8 +20,8 @@ func main() {
 	fmt.Printf("Started!\n")
 	fmt.Println("The cab copy is: ", InitCabCopy)
 
-	Channels := network.NewElevatorSystemChannels()
-	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool) 
+	Channels := primary_backup.NewElevatorSystemChannels()
+	CabCopyCh := make(chan [elevio.N_Floors][elevio.N_Buttons]bool)
 
 	device := elevio.ElevInputDevice{
 		FloorSensorCh:   make(chan int),
@@ -35,16 +35,16 @@ func main() {
 	go elevio.PollStopButton(device.StopButtonCh)
 	go elevio.PollObstructionSwitch(device.ObstructionCh)
 
-	go network.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
+	go primary_backup.InitNetwork(Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.StateUpdateCh, Channels.HallOrderCompleteCh, Channels.DisconnectedElevatorCh, Channels.FSMAssignedHallRequestsCh, Channels.AssignHallRequestsMapCh, Channels.AckCh) // Alias: RunPrimaryBackup()
 	// REFACTOR: Can be moved to InitNetwork()?
 
 	//run local elevator
-	go fsm.LocalElevatorFSM(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy) 
+	go fsm.LocalElevatorFSM(device, Channels.FSMStateUpdateCh, Channels.FSMHallOrderCompleteCh, Channels.FSMAssignedHallRequestsCh, CabCopyCh, InitCabCopy)
 
-	go network.RestartOnReconnect(CabCopyCh)
+	go primary_backup.RestartOnReconnect(CabCopyCh)
 
-	go network.UDPReadCombinedHallRequests(network.HALL_LIGHTS_PORT)
-	go network.UDPBroadcastAlive(network.LOCAL_ELEVATOR_ALIVE_PORT)
+	go primary_backup.UDPReadCombinedHallRequests(primary_backup.HALL_LIGHTS_PORT)
+	go primary_backup.UDPBroadcastAlive(primary_backup.LOCAL_ELEVATOR_ALIVE_PORT)
 
 	select {}
 
