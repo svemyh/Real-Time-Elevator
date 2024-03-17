@@ -294,6 +294,26 @@ func TCPReadAssignedHallRequests(conn net.Conn, FSMAssignedHallRequestsCh chan [
 				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
 			}
 			fmt.Println("TCPReadAssignedHallRequests() - Recieved PING: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
+		case TypeTimestamp:
+			var msg MsgString
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				panic(err) //TODO: can be changed to continue, but has as panic for debug purpuses
+			}
+			fmt.Println("TCPReadAssignedHallRequests() - Recieved TypeTimestamp: ", msg.Content, " -RemoteAddr: ", conn.LocalAddr().String(), "-RemoteAddr: ", conn.RemoteAddr().String())
+			TimestampMsg := MsgString{
+				Type:    TypeTimestamp,
+				Content: msg.Content,
+			}
+			data, err := json.Marshal(TimestampMsg)
+			if err != nil {
+				fmt.Printf("Failed to encode MsgString to json: %v\n", err)
+			}
+			_, err = conn.Write(data)
+			if err != nil {
+				fmt.Printf("Failed to return heartbeat: %v\n", err)
+			}
+			fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
+			time.Sleep(350 * time.Millisecond) // Try reducing this to minimal possible value.
 		default:
 			fmt.Println("TCPReadAssignedHallRequests() - Unknown message type")
 		}
@@ -425,8 +445,9 @@ func TCPWriteAssignedHallRequests(conn net.Conn, personalAssignedHallRequestsCh 
 	}
 }
 
+// UNUSED
 // Continously monitors that a net.Conn is still alive
-func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) {
+func SendHeartbeatsV0(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) {
 	timestamp := time.Now().Format("15:04:05")
 	timestampCh := make(chan string, 1024)
 	timestampCh <- timestamp
@@ -476,6 +497,56 @@ func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan str
 			errCh <- errors.New("heartbeat timeout: connection might be broken")
 			close(timestampCh)
 			return
+		}
+	}
+}
+
+// Continously monitors that a net.Conn is still alive
+func SendHeartbeats(conn net.Conn, errCh chan<- error, ReadHeartbeatsCh chan string) {
+	timestampCh := make(chan string, 1024)
+
+	timestamp := time.Now().Format("15:04:05")
+	timestampCh <- timestamp
+
+	fmt.Println("INIT SendHeartbeats() -  timestamp:", timestamp)
+	for {
+		select {
+		case t := <-ReadHeartbeatsCh:
+			if t == timestamp {
+				fmt.Println("Recieved timestamp as ACK: ", t)
+				timestamp = time.Now().Format("15:04:05")
+				timestampCh <- timestamp
+			}
+		case tt := <-timestampCh:
+			fmt.Println("tt := <-timestampCh recieved: ", tt)
+			timestamp = tt
+			time.Sleep(750 * time.Millisecond)
+
+		case <-time.After(5 * time.Second):
+			fmt.Println("____-----_____-----_____---- Heartbeat not acknowledged in time.")
+			errCh <- errors.New("heartbeat timeout: connection might be broken")
+			close(timestampCh)
+			return
+
+		default:
+			TimestampMsg := MsgString{
+				Type:    TypeTimestamp,
+				Content: timestamp,
+			}
+			data, err := json.Marshal(TimestampMsg)
+			if err != nil {
+				fmt.Printf("Failed to encode MsgString to json: %v\n", err)
+				errCh <- err
+				return
+			}
+			_, err = conn.Write(data)
+			if err != nil {
+				fmt.Printf("Failed to send heartbeat: %v\n", err)
+				errCh <- err
+				return
+			}
+			fmt.Println(" -- SendHeartbeats sent ", TimestampMsg, "from localaddr:", conn.LocalAddr().String(), "to remoteaddr: ", conn.RemoteAddr().String())
+			time.Sleep(350 * time.Millisecond) // Try reducing this to minimal possible value.
 		}
 	}
 }
