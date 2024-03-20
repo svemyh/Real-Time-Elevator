@@ -1,84 +1,137 @@
 Elevator Project
 ================
 
-Create software for controlling `n` elevators working in parallel across `m` floors.
+### Overview
 
-Main requirements
------------------
+This project implements a distributed control system for managing `n` elevators in real-time across `m` floors. The system dynamically assigns floor orders to available elevators, optimizes elevator movements, and handles elevator malfunctions (e.g., stuck elevators and disconnected elevators) to ensure efficient operation. 
 
-### The button lights are a service guarantee
- - Once the light on a hall call button (buttons for calling an elevator to that floor; top 6 buttons on the control panel) is turned on, an elevator should arrive at that floor
- - Similarly for a cab call (for telling the elevator what floor you want to exit at; front 4 buttons on the control panel), but only the elevator at that specific workspace should take the order
+### Our solution
+We wrote our solution in Google Go. To acheive the desired fault tolerance we have multiple computers communicating with each other. We then chose to implement a primary/backup structure where all elevators operate as a "Local Elevators" and 2 of the elevators will also be promoted to a Primary role and Backup role respectivly. The primary elevator has extra responsibility to:
 
-### No calls are lost
- - Failure states are anything that prevents the elevator from communicating with other elevators or servicing calls
-   - This includes losing network connection entirely, software that crashes, doors that won't close, and losing power - both to the elevator motor and the machine that controls the elevator
-   - Network packet loss is not a failure, and can occur at any time
-   - An elevator entering the network is not a failure
- - No calls should be lost in the presence of failures
-   - For cab calls, handling loss of power or software crash implies that the calls are executed once service to that elevator is restored
-   - The time used to handle (compensate for) these failures should be reasonable, i.e. on the order of magnitude of seconds (not minutes)
- - If the elevator is disconnected from the network, it should still serve all the currently active calls (i.e. whatever lights are showing)
-   - It should also keep taking new cab calls so that people can exit the elevator even if it is disconnected from the network
-   - The elevator software should not require reinitialization (manual restart) after intermittent network or motor power loss
+   collect the state of every elevator
+   collect all orders and order completions from all elevators
+   calculate the resulting order assignments
+   send orders and assignment to all elevators.
 
-### The lights and buttons should function as expected
- - The hall call buttons on all workspaces should let you summon an elevator
- - Under normal circumstances, the lights on the hall buttons should show the same thing on all workspaces
-   - Normal circumstances mean when there are no active failures and no packet loss
-   - Under circumstances with packet loss, at least one light must work as expected
- - The cab button lights should not be shared between workspaces
- - The cab and hall button lights should turn on as soon as is reasonable after the button has been pressed
-   - Not ever turning on the button lights because "no guarantee is offered" is not a valid solution
-   - You are allowed to expect the user to press the button again if it does not light up
- - The cab and hall button lights should turn off when the corresponding call has been serviced
+The Backup is responsible for keeping an exact copy of al the information that the primary has. If the primary loses internet connection or stops responding for other reasons the backup will be promoted to a primary. It will then promote another backup to replace it (if another elevator is available).
 
-### The door should function as expected
- - The "door open" lamp should be used as a substitute for an actual door
-   - The door should not be open (light switched on) while the elevator is moving
-   - The duration for keeping the door open when stopping at a floor should be 3 (three) seconds
- - The obstruction switch should substitute the door obstruction sensor inside the elevator
-   - The door should not close while it is obstructed
-   - The obstruction can trigger (and un-trigger) at any time
+The communication between elevators is done with a combination of TCP and UDP. There is a TCP connection between the primary and every availible local elevator in order to ensure reliable network communication between them. We also have a seperate TCP connection between the Primary and Backup. Our solution also uses UDP broadcasts. The primary will broadcast its role repeatedly to all elevators on the network. If an elevator enters the network it will check if there is a primary, if not it will promote itself to a primary. Otherwise it will remain as a simple local elevator. All elevators are also responsible for broadcasting that they are still connected to the network through UDP. The Primary implements a simple counter based in this to reliably notice when an elevator has been disconnected.
+All signals from the primary to local elevators regarding which hall request button lights should be active are also broadcasted by UDP. 
 
-### An individual elevator should behave sensibly and efficiently
- - No stopping at every floor "just to be safe"
- - Clearing a hall call button light is assumed to mean that the elevator that arrived at that floor announces "going up" or "going down" to the user (for up and down buttons respectively), and users are assumed to only enter an elevator moving in the direction they have requested
-   - This means that a single elevator arriving at a floor should *not* clear both up and down calls simultaneously
-   - If the elevator has no reason to travel in the direction it has announced (e.g. both up and down are requested, but the people entering the elevator all want to go down), the elevator should "announce" that it is changing direction by first clearing the call in the opposite direction, then keeping the door open for another 3 seconds
+### Key features
 
-Secondary requirements
-----------------------
+- **Dynamic hall Request assignment:** Efficiently distributes hall requests among active elevators based on their current state and location.
+- **Real-time monitoring:** Monitors the operational status of each elevator, adjusting assignments as elevators become available or stuck.
+- **Fault tolerance:** Detects and responds to elevator malfunctions, removing stuck elevators from the pool of active units until they are operational again.
 
-*These requirements will only be regarded if the system satisfies the main requirements.*
+### System Components
 
-### Calls should be served as efficiently as possible
- - The calls should be distributed across the elevators in such a way that they are serviced as soon as possible
+1. **Elevator module:** Simulates elevator operations, including moving between floors, opening/closing doors, and executing floor requests.
+2. **Hall request assigner:** Allocates hall requests to elevators based on their current state and proximity to requested floors.
+3. **Finite state machine** Implements a state machine to control a local elevator based on their current state
+4  **Elevio** Facilitates communication between input / output between the elevator software and elevator hardware such as detecting button presses etc. 
+5  **Timer** implements simple timer functions such as starting a timer, stoping a timer and checking for a time-out
+6  **primary_Backup:** Facilitates implements all logic needed to implement the primary and backup role architecture mentioned above. Contains the following sub-modules
+7  **Conn** Includes a function to enable UDP broadvasting on a local network
+   1) **Primary** Manages the overall system state, including tracking active elevators and their statuses, and runs the hall request assigner logic.
+   2) **Backup** Takes over Primary Controller should the primary elevator fail, constantly keeping track of active elevators and their statuses for quick recovery
+   3) **Network** Contains all functions that are exclusivly network related and independent on an elevator system
+
+### Running the system
+
+# Testing on a model elevator
+1. Give permission to `hall_request_assigner` and `elevatorserver`elevatorserver using `chmod +x filename`
+2. Launch `elevatorserver` in a terminal
+3. Launch `go run main.go` in a terminal
+
+# If you want to run from a simulator
+1. Give permission to SimElevatorServer by using `chmod +x SimElevatorServer`
+2. Launch `./SimElevatorServer` in a terminal
+3. Launch `go run main.go` in a terminal
+4. The default port of the simulation is set to 15657. If you want to test on a specific port, enter `./SimElevatorServer --port <your-port>`, and replace `<your-port>` with your desired port number
 
 
-Permitted assumptions
----------------------
+### Prerequisites
 
-The following assumptions will always be valid during testing:
- 1. There is always at least one elevator that is not in a failure state
-    - I.e. there is always at least one elevator that can serve calls
-    - "No failure" includes the door obstruction: At least one elevator will be able to close its doors
- 2. Cab call redundancy with a single elevator or a disconnected elevator is not required
-    - Given assumption **1**, a system containing only one elevator is assumed to be unable to fail
-    - In a system containing more than one elevator, a disconnected elevator will not have more failures
- 3. No network partitioning: There will never be a situation where there are multiple sets of two or more elevators with no connection between them
-    - Note that this needs 4 or more elevators to become applicable, which we will not test anyway
+- Go (version 1.14 or later) installed on your system.
+- Access to a Linux operating system for deployment.Elevator Project
+================
+
+### Overview
+
+This project implements a distributed control system for managing `n` elevators in real-time across `m` floors. The system dynamically assigns floor orders to available elevators, optimizes elevator movements, and handles elevator malfunctions (e.g., stuck elevators and disconnected elevators) to ensure efficient operation. 
+
+### Our solution
+We wrote our solution in Google Go. To acheive the desired fault tolerance we have multiple computers communicating with each other. We then chose to implement a primary/backup structure where all elevators operate as a "Local Elevators" and 2 of the elevators will also be promoted to a Primary role and Backup role respectivly. The primary elevator has extra responsibility to:
+
+   collect the state of every elevator
+   collect all orders and order completions from all elevators
+   calculate the resulting order assignments
+   send orders and assignment to all elevators.
+
+The Backup is responsible for keeping an exact copy of al the information that the primary has. If the primary loses internet connection or stops responding for other reasons the backup will be promoted to a primary. It will then promote another backup to replace it (if another elevator is available).
+
+The communication between elevators is done with a combination of TCP and UDP. There is a TCP connection between the primary and every availible local elevator in order to ensure reliable network communication between them. We also have a seperate TCP connection between the Primary and Backup. Our solution also uses UDP broadcasts. The primary will broadcast its role repeatedly to all elevators on the network. If an elevator enters the network it will check if there is a primary, if not it will promote itself to a primary. Otherwise it will remain as a simple local elevator. All elevators are also responsible for broadcasting that they are still connected to the network through UDP. The Primary implements a simple counter based in this to reliably notice when an elevator has been disconnected.
+All signals from the primary to local elevators regarding which hall request button lights should be active are also broadcasted by UDP. 
+
+### Key features
+
+- **Dynamic hall Request assignment:** Efficiently distributes hall requests among active elevators based on their current state and location.
+- **Real-time monitoring:** Monitors the operational status of each elevator, adjusting assignments as elevators become available or stuck.
+- **Fault tolerance:** Detects and responds to elevator malfunctions, removing stuck elevators from the pool of active units until they are operational again.
+
+### System Components
+
+1. **Elevator module:** Simulates elevator operations, including moving between floors, opening/closing doors, and executing floor requests.
+2. **Hall request assigner:** Allocates hall requests to elevators based on their current state and proximity to requested floors.
+3. **Finite state machine** Implements a state machine to control a local elevator based on their current state
+4  **Elevio** Facilitates communication between input / output between the elevator software and elevator hardware such as detecting button presses etc. 
+5  **Timer** implements simple timer functions such as starting a timer, stoping a timer and checking for a time-out
+6  **primary_Backup:** Facilitates implements all logic needed to implement the primary and backup role architecture mentioned above. Contains the following sub-modules
+7  **Conn** Includes a function to enable UDP broadvasting on a local network
+   1) **Primary** Manages the overall system state, including tracking active elevators and their statuses, and runs the hall request assigner logic.
+   2) **Backup** Takes over Primary Controller should the primary elevator fail, constantly keeping track of active elevators and their statuses for quick recovery
+   3) **Network** Contains all functions that are exclusivly network related and independent on an elevator system
+
+### Running the system
+
+# Testing on a model elevator
+1. Give permission to `hall_request_assigner` and `elevatorserver`elevatorserver using `chmod +x filename`
+2. Launch `elevatorserver` in a terminal
+3. Launch `go run main.go` in a terminal
+
+# If you want to run from a simulator
+1. Give permission to SimElevatorServer by using `chmod +x SimElevatorServer`
+2. Launch `./SimElevatorServer` in a terminal
+3. Launch `go run main.go` in a terminal
+4. The default port of the simulation is set to 15657. If you want to test on a specific port, enter `./SimElevatorServer --port <your-port>`, and replace `<your-port>` with your desired port number
 
 
-Unspecified behavior
---------------------
-Some things are left intentionally unspecified. Their implementation will not be tested and are therefore up to you.
+### Prerequisites
 
-How the elevator behaves when it cannot connect to the network (router) during initialization
- - You can either enter a "single-elevator" mode or refuse to start
+- Go (version 1.14 or later) installed on your system.
+- Access to a Linux operating system for deployment.
 
-How the hall (call up, call down) buttons work when the elevator is disconnected from the network
- - You can optionally refuse to take these new calls
-
-What the stop button does
- - The stop button functionality (if/when implemented) is up to you
+  ## Contributors
+<table>
+  <tr>
+    <td align="center">
+        <a href="https://github.com/MikaelShahly">
+            <img src="https://github.com/MikaelShahly.png?size=100" width="100px;" alt="Mikael Shahly"/><br />
+            <sub><b>Mikael Shah</b></sub>
+        </a>
+    </td>
+    <td align="center">
+        <a href="https://github.com/AntTra">
+            <img src="https://github.com/AntTra.png?size=100" width="100px;" alt="Anton Tran"/><br />
+            <sub><b>Anton Tran</b></sub>
+        </a>
+    </td>
+    <td align="center">
+        <a href="https://github.com/svemyh">
+            <img src="https://github.com/svemyh.png?size=100" width="100px;" alt="Sveinung Myhre"/><br />
+            <sub><b>Sveinung Myhre</b></sub>
+        </a>
+    </td>
+  </tr>
+</table>
