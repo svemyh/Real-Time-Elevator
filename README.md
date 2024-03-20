@@ -118,7 +118,7 @@ All signals from the primary to local elevators regarding which hall request but
     <td align="center">
         <a href="https://github.com/MikaelShahly">
             <img src="https://github.com/MikaelShahly.png?size=100" width="100px;" alt="Mikael Shahly"/><br />
-            <sub><b>Mikael Shah</b></sub>
+            <sub><b>Mikael Shahly</b></sub>
         </a>
     </td>
     <td align="center">
