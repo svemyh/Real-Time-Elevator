@@ -12,12 +12,12 @@ import (
 	"time"
 )
 
-func BackupRoutine(conn 					net.Conn,
-				   StateUpdateCh 			chan hall_request_assigner.ActiveElevator,
-				   HallOrderCompleteCh 		chan elevio.ButtonEvent,
-				   DisconnectedElevatorCh 	chan string,
-				   AssignHallRequestsCh 	chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-				   AckCh 					chan bool,
+func BackupRoutine(conn net.Conn,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool,
 ) {
 	BackupActiveElevatorMap := make(map[string]elevator.Elevator)
 	var BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool
@@ -83,13 +83,13 @@ func CheckPrimaryAlive(PrimaryDeadCh chan bool) {
 	}
 }
 
-func BecomePrimary(BackupActiveElevatorMap 		map[string]elevator.Elevator,
-				   BackupCombinedHallRequests 	[elevio.N_Floors][elevio.N_Buttons - 1]bool,
-				   StateUpdateCh 				chan hall_request_assigner.ActiveElevator,
-				   HallOrderCompleteCh 			chan elevio.ButtonEvent,
-				   DisconnectedElevatorCh 		chan string,
-				   AssignHallRequestsCh 		chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
-				   AckCh 						chan bool,
+func BecomePrimary(BackupActiveElevatorMap map[string]elevator.Elevator,
+	BackupCombinedHallRequests [elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	StateUpdateCh chan hall_request_assigner.ActiveElevator,
+	HallOrderCompleteCh chan elevio.ButtonEvent,
+	DisconnectedElevatorCh chan string,
+	AssignHallRequestsCh chan map[string][elevio.N_Floors][elevio.N_Buttons - 1]bool,
+	AckCh chan bool,
 ) {
 
 	// When AssignedHallRequestsCh recieves a message, StartBroadcaster() distributes it to each of the personalAssignedHallRequestsCh used in TCPWriteElevatorStates()

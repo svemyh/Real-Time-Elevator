@@ -170,7 +170,6 @@ func LocalElevatorFSM(device elevio.ElevInputDevice,
 			}
 
 			if buttonEvent.Button == elevio.ButtonType(elevio.BT_Cab) {
-				fmt.Println("Cab press detected")
 				handleRequestButtonPress(buttonEvent.Floor, elevio.ButtonType(buttonEvent.Button), FSMHallOrderCompleteCh, CabCopyCh)
 			}
 
